@@ -1,0 +1,41 @@
+{
+	"schemaVersion": 1,
+	"id": "cjm_skyisland",
+	"version": "${version}",
+	"name": "cjm_skyisland",
+	"description": "This is an example description! Tell everyone what your mod is about!",
+	"authors": [
+		"Me!"
+	],
+	"contact": {
+		"homepage": "https://fabricmc.net/",
+		"sources": "https://github.com/FabricMC/fabric-example-mod"
+	},
+	"license": "CC0-1.0",
+	"icon": "assets/cjm_skyisland/icon.png",
+	"environment": "*",
+	"entrypoints": {
+		"main": [
+			"com.cjm.skyisland.Cjm_skyisland"
+		],
+		"client": [
+			"com.cjm.skyisland.client.Cjm_skyislandClient"
+		],
+		"fabric-datagen": [
+			"com.cjm.skyisland.client.Cjm_skyislandDataGenerator"
+		]
+	},
+	"mixins": [
+		"cjm_skyisland.mixins.json",
+		{
+			"config": "cjm_skyisland.client.mixins.json",
+			"environment": "client"
+		}
+	],
+	"depends": {
+		"fabricloader": ">=0.19.5",
+		"minecraft": "~26.3",
+		"java": ">=25",
+		"fabric-api": "*"
+	}
+}
