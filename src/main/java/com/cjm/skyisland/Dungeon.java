@@ -454,7 +454,8 @@ public final class Dungeon {
 		inDungeonSince.put(player.getUUID(), now);
 
 		final BlockPos floor = randomSpawnPos(world, data);
-		player.teleportTo(world, floor.getX() + 0.5, floor.getY() + 1, floor.getZ() + 0.5,
+		// randomSpawnPos 返回的是「地板上方那一格」，玩家脚部正好落在这一格，直接踩在石地板上
+		player.teleportTo(world, floor.getX() + 0.5, floor.getY(), floor.getZ() + 0.5,
 				Set.of(), player.getYRot(), player.getXRot(), false);
 		player.sendSystemMessage(Component.literal("你已进入副本空岛：100 只怪物、4 个奖励箱。"));
 		player.sendSystemMessage(Component.literal("最少停留 5 分钟才能从中央传送阵离开，20 分钟后会被强制淘汰。"));
