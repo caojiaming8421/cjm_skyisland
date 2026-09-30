@@ -29,11 +29,14 @@ public class Cjm_skyisland implements ModInitializer {
 			.build(ResourceKey.create(Registries.ENTITY_TYPE, id("villager")))
 	);
 
+	/** 刷怪蛋物品 id：26.x 的 Item.Properties 必须显式 setId，否则构造 Item 时抛 "Item id not set" */
+	private static final ResourceKey<Item> CJM_VILLAGER_EGG_ID = ResourceKey.create(Registries.ITEM, id("villager_spawn_egg"));
+
 	/** 对应的刷怪蛋（id: cjm_skyisland:villager_spawn_egg） */
 	public static final Item CJM_VILLAGER_EGG = Registry.register(
 		BuiltInRegistries.ITEM,
-		id("villager_spawn_egg"),
-		new SpawnEggItem(new Item.Properties().spawnEgg(CJM_VILLAGER))
+		CJM_VILLAGER_EGG_ID,
+		new SpawnEggItem(new Item.Properties().spawnEgg(CJM_VILLAGER).setId(CJM_VILLAGER_EGG_ID))
 	);
 
 	/**

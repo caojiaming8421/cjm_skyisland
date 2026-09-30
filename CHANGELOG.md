@@ -10,6 +10,16 @@
 
 ---
 
+## [1.3.1] - 2026-09-30
+
+修复游戏启动时崩溃：`ExceptionInInitializerError` / `NullPointerException: Item id not set`。
+
+### 修复
+- 刷怪蛋的物品 id 改为显式声明：`new Item.Properties().spawnEgg(CJM_VILLAGER).setId(CJM_VILLAGER_EGG_ID)`，并以同一个 `ResourceKey<Item>` 注册
+- 根因：26.x 的 `Item.Properties` 必须调用 `setId(ResourceKey<Item>)` 才能在构造 `Item` 时确定物品 id，否则构造过程抛 `Item id not set`；原版 `Items.registerItem` 也是先 `properties.setId(id)` 再构造
+
+---
+
 ## [1.3.0] - 2026-09-30
 
 每个空岛生成时默认附带一只「空岛村民」。
