@@ -120,6 +120,8 @@ public final class Dungeon {
 		List<BlockPos> chests = new ArrayList<>();
 		/** 平台是否已经建造过。 */
 		boolean built = false;
+		/** 建造平台时用的边长。与 {@link DungeonConfig#SIZE} 不一致就说明尺寸改过，需要重建。 */
+		int builtSize = 0;
 
 		/** {@code Map<UUID, Long>} 的编解码（用字符串形式的 UUID 做 key，避免依赖额外 codec）。 */
 		static final Codec<Map<UUID, Long>> UUID_LONG_MAP = Codec.unboundedMap(Codec.STRING, Codec.LONG).xmap(
@@ -138,18 +140,20 @@ public final class Dungeon {
 		static final Codec<DungeonData> CODEC = RecordCodecBuilder.create(instance -> instance.group(
 						UUID_LONG_MAP.optionalFieldOf("last_entry", new HashMap<>()).forGetter(d -> d.lastEntry),
 						BlockPos.CODEC.listOf().optionalFieldOf("chests", new ArrayList<>()).forGetter(d -> d.chests),
-						Codec.BOOL.optionalFieldOf("built", Boolean.FALSE).forGetter(d -> d.built)
+						Codec.BOOL.optionalFieldOf("built", Boolean.FALSE).forGetter(d -> d.built),
+						Codec.INT.optionalFieldOf("built_size", Integer.valueOf(0)).forGetter(d -> Integer.valueOf(d.builtSize))
 				).apply(instance, DungeonData::new)
 		);
 
-		DungeonData(final Map<UUID, Long> lastEntry, final List<BlockPos> chests, final Boolean built) {
+		DungeonData(final Map<UUID, Long> lastEntry, final List<BlockPos> chests, final Boolean built, final Integer builtSize) {
 			this.lastEntry.putAll(lastEntry);
 			this.chests = new ArrayList<>(chests);
 			this.built = Boolean.TRUE.equals(built);
+			this.builtSize = builtSize == null ? 0 : builtSize.intValue();
 		}
 
 		DungeonData() {
-			this(new HashMap<>(), new ArrayList<>(), Boolean.FALSE);
+			this(new HashMap<>(), new ArrayList<>(), Boolean.FALSE, Integer.valueOf(0));
 		}
 	}
 
@@ -244,8 +248,14 @@ public final class Dungeon {
 
 	/** 首次进入时建造副本平台（只建一次，之后靠存档标记跳过）。 */
 	private static void ensureBuilt(final ServerLevel world, final DungeonData data) {
-		if (data.built && data.chests.size() == DungeonConfig.CHEST_COUNT) {
+		// builtSize 与当前配置不一致 = 改过 SIZE，需要推倒重建
+		final boolean sizeChanged = data.built && data.builtSize != DungeonConfig.SIZE;
+		if (data.built && !sizeChanged && data.chests.size() == DungeonConfig.CHEST_COUNT) {
 			return;
+		}
+		if (sizeChanged) {
+			LOGGER.info("[skyisland] 副本尺寸由 {} 改为 {}，正在重建平台", data.builtSize, DungeonConfig.SIZE);
+			clearPlatform(world, data.builtSize);
 		}
 		// 强制加载副本所在区块，否则 setBlock / getBlockState 会作用在空气上
 		for (int sx = SectionPos.blockToSectionCoord(DungeonConfig.MIN_X); sx <= SectionPos.blockToSectionCoord(DungeonConfig.MAX_X); sx++) {
@@ -283,9 +293,36 @@ public final class Dungeon {
 			world.setBlockAndUpdate(pos, Blocks.CHEST.defaultBlockState());
 		}
 		data.built = true;
+		data.builtSize = DungeonConfig.SIZE;
 		data.setDirty();
-		LOGGER.info("[skyisland] 副本空岛已建造于 ({}, {})，奖励箱 {} 个",
-				DungeonConfig.CENTER_X, DungeonConfig.CENTER_Z, data.chests.size());
+		LOGGER.info("[skyisland] 副本空岛已建造于 ({}, {})，{}x{}，奖励箱 {} 个",
+				DungeonConfig.CENTER_X, DungeonConfig.CENTER_Z,
+				DungeonConfig.SIZE, DungeonConfig.SIZE, data.chests.size());
+	}
+
+	/**
+	 * 清掉一座旧平台的地板、围墙、传送阵与奖励箱。
+	 * 改了 {@link DungeonConfig#SIZE} 重建时必须先清，否则旧的玻璃围墙会留在放大后的平台中间。
+	 */
+	private static void clearPlatform(final ServerLevel world, final int oldSize) {
+		final int half = Math.max(oldSize, 1) / 2;
+		final int minX = DungeonConfig.CENTER_X - half;
+		final int maxX = DungeonConfig.CENTER_X + half - 1;
+		final int minZ = DungeonConfig.CENTER_Z - half;
+		final int maxZ = DungeonConfig.CENTER_Z + half - 1;
+		for (int sx = SectionPos.blockToSectionCoord(minX); sx <= SectionPos.blockToSectionCoord(maxX); sx++) {
+			for (int sz = SectionPos.blockToSectionCoord(minZ); sz <= SectionPos.blockToSectionCoord(maxZ); sz++) {
+				world.getChunkSource().getChunk(sx, sz, ChunkStatus.FULL, true);
+			}
+		}
+		final BlockState air = Blocks.AIR.defaultBlockState();
+		for (int x = minX; x <= maxX; x++) {
+			for (int z = minZ; z <= maxZ; z++) {
+				for (int h = -1; h <= DungeonConfig.WALL_HEIGHT; h++) {
+					world.setBlockAndUpdate(new BlockPos(x, DungeonConfig.Y + h, z), air);
+				}
+			}
+		}
 	}
 
 	/** 随机挑 4 个互不重叠、且避开中央传送阵与围墙的奖励箱位置。 */

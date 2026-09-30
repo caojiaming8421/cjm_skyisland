@@ -13,8 +13,8 @@ package com.cjm.skyisland.world;
  * </ul>
  */
 public final class DungeonConfig {
-	/** 副本平台边长（50x50）。 */
-	public static final int SIZE = 50;
+	/** 副本平台边长（100x100）。改这个值会让已存在的存档在下一次进入时自动重建平台。 */
+	public static final int SIZE = 100;
 	/** 半边长。 */
 	public static final int HALF = SIZE / 2;
 	/**
