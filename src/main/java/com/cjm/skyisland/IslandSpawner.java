@@ -19,11 +19,20 @@ import net.minecraft.world.level.Level;
 import net.minecraft.world.level.block.AbstractBedBlock;
 import net.minecraft.world.level.block.Blocks;
 import net.minecraft.world.level.block.state.BlockState;
+import net.minecraft.core.SectionPos;
+import net.minecraft.core.UUIDUtil;
+import net.minecraft.resources.Identifier;
+import net.minecraft.util.datafix.DataFixTypes;
+import net.minecraft.world.level.chunk.status.ChunkStatus;
+import net.minecraft.world.level.saveddata.SavedData;
+import net.minecraft.world.level.saveddata.SavedDataType;
 import net.minecraft.world.level.storage.LevelData;
 import net.minecraft.world.phys.AABB;
 import org.slf4j.Logger;
 
+import java.util.HashSet;
 import java.util.Set;
+import java.util.UUID;
 
 /**
  * 负责给每个玩家生成专属空岛，并保证「没有有效重生锚点时必回空岛」。
@@ -44,10 +53,44 @@ import java.util.Set;
  * </ol>
  *
  * <p>「中心点是否为空气」用于判断岛是否存在：平台方块持久化在存档里，重启后照样在，
- * 只在真正缺失时才重建，避免重复生成。
+ * 只在真正缺失时才重建，避免重复生成。判定前会先加载岛所在区块——否则未加载区块上
+ * getBlockState 误报空气，会每次进服都重建岛 + 重复发初始物资。
  */
 public final class IslandSpawner {
 	private static final Logger LOGGER = LogUtils.getLogger();
+
+	/**
+	 * 记录「哪些玩家已领取过初始物资」的存档数据（按玩家 UUID 存储），跨进服 / 重生 / 重启都保留，
+	 * 用于保证初始物资每个玩家只发一次，避免重复进入世界时反复给。
+	 */
+	private static final class StarterKitData extends SavedData {
+		private final Set<UUID> received = new HashSet<>();
+
+		boolean has(final UUID id) {
+			return received.contains(id);
+		}
+
+		void mark(final UUID id) {
+			received.add(id);
+			setDirty();
+		}
+
+		static final com.mojang.serialization.Codec<StarterKitData> CODEC = UUIDUtil.CODEC_SET.xmap(
+				set -> {
+					final StarterKitData d = new StarterKitData();
+					d.received.addAll(set);
+					return d;
+				},
+				d -> d.received
+		);
+	}
+
+	private static final SavedDataType<StarterKitData> STARTER_KIT_TYPE = new SavedDataType<>(
+			Identifier.fromNamespaceAndPath("cjm_skyisland", "starter_kit"),
+			StarterKitData::new,
+			StarterKitData.CODEC,
+			DataFixTypes.PLAYER
+	);
 
 	private IslandSpawner() {
 	}
@@ -84,6 +127,11 @@ public final class IslandSpawner {
 	 */
 	private static boolean buildIsland(final ServerPlayer player, final ServerLevel world) {
 		final BlockPos center = islandCenter(player);
+		// 先确保岛所在区块已加载：未加载时 getBlockState 会误报空气，导致每次进服都判定「岛缺失」而重建 + 重复发物资
+		world.getChunkSource().getChunk(
+				SectionPos.blockToSectionCoord(center.getX()),
+				SectionPos.blockToSectionCoord(center.getZ()),
+				ChunkStatus.FULL, true);
 		if (!world.getBlockState(center).isAir()) {
 			return false; // 平台已存在
 		}
@@ -126,7 +174,7 @@ public final class IslandSpawner {
 		villager.setPersistenceRequired(); // 不因距离过远而消失
 	}
 
-	/** 新玩家首次生成空岛时发放的初始物资：1 个橡树树苗 + 4 个骨粉。只在新岛建成时调用一次。 */
+	/** 发放初始物资：1 个橡树树苗 + 4 个骨粉（是否只发一次由调用方用 StarterKitData 标记控制）。 */
 	private static void giveStarterKit(final ServerPlayer player) {
 		player.getInventory().add(new ItemStack(Items.OAK_SAPLING, 1));
 		player.getInventory().add(new ItemStack(Items.BONE_MEAL, 4));
@@ -200,7 +248,7 @@ public final class IslandSpawner {
 		LOGGER.info("[skyisland] 触发原因：{}", reason);
 	}
 
-	/** 进服时：确保岛存在、岛上有一只空岛村民；新建空岛时发放初始物资（橡树树苗×1 + 骨粉×4）；没有有效重生点时才把玩家放到岛上并设重生点。 */
+	/** 进服时：确保岛存在、岛上有一只空岛村民；每个玩家仅发放一次初始物资（橡树树苗×1 + 骨粉×4）；没有有效重生点时才把玩家放到岛上并设重生点。 */
 	public static void ensureIsland(final ServerPlayer player) {
 		final MinecraftServer server = serverOf(player);
 		if (server == null) {
@@ -210,11 +258,13 @@ public final class IslandSpawner {
 		if (world == null) {
 			return;
 		}
-		final boolean newIsland = buildIsland(player, world);
+		buildIsland(player, world);
 		// 岛已存在但村民被杀掉/丢失时也会补齐，保证「每个空岛默认一只」
 		ensureIslandVillager(player, world);
-		// 首次生成空岛（平台新建）时发放初始物资，之后进服不再重复给
-		if (newIsland) {
+		// 初始物资：每个玩家仅发放一次（用存档数据按 UUID 标记，跨进服 / 重生 / 重启保留）
+		final StarterKitData kitData = world.getDataStorage().computeIfAbsent(STARTER_KIT_TYPE);
+		if (!kitData.has(player.getUUID())) {
+			kitData.mark(player.getUUID());
 			giveStarterKit(player);
 		}
 		// 已有有效锚点（比如上次睡的床还在）就不动他，避免每次进服都把重生点冲掉
