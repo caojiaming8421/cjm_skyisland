@@ -10,6 +10,29 @@
 
 ---
 
+## [1.3.4] - 2026-09-30
+
+空岛村民专属外观：冷色调 + 商人帽，并补上刷怪蛋缺失的贴图与模型定义。
+
+### 新增
+- `assets/cjm_skyisland/textures/entity/cjm_villager.png`（64x64）：由原版 `villager.png` 改色而来
+  - 全图色相压到 **184°–227°**（青→蓝）；亮部降饱和成淡青灰（皮肤），暗部保留饱和度成深靛蓝（袍子）
+  - `hat` 层（UV 32–64, 0–18）画一顶**商人帽**：帽冠（侧面 v8–13）+ 帽檐（v13–15，比头大 0.51 所以略微外扩）+ 帽顶高光 + 额前青色宝石
+  - 帽子只覆盖头的上半部，v15 以下留空，不遮脸
+- `assets/cjm_skyisland/textures/item/villager_spawn_egg.png`（16x16）：原版蛋冷色化，深青底 + 亮青斑
+- `assets/cjm_skyisland/items/villager_spawn_egg.json` + `models/item/villager_spawn_egg.json`：26.x 物品模型定义
+  （此前缺失，创造栏里那颗蛋没有模型，会渲染成缺失纹理紫黑块）
+
+### 变更
+- `CjmVillagerRenderer.TEXTURE` 从原版 `minecraft:textures/entity/villager/villager.png`
+  改为 `cjm_skyisland:textures/entity/cjm_villager.png`。UV 布局未变，仍复用 `ModelLayers.VILLAGER`
+
+### 环境
+- **索引色 PNG 陷阱**：原版贴图是 `TYPE_BYTE_INDEXED`（24 色），直接 `setRGB` 会被吸附到最近的索引色、改色不生效。
+  必须先 `new BufferedImage(w, h, TYPE_INT_ARGB)` 并 `drawImage` 转一次再逐像素处理
+
+---
+
 ## [1.3.3] - 2026-09-30
 
 修复「把床设为重生点后又拆掉床，重生位置变成随机」。
