@@ -2,14 +2,15 @@
 	"schemaVersion": 1,
 	"id": "cjm_skyisland",
 	"version": "${version}",
-	"name": "cjm_skyisland",
-	"description": "This is an example description! Tell everyone what your mod is about!",
+	"name": "空岛纪元",
+	"description": "空岛生存模组：新增虚空空岛世界类型，附带专属的空岛村民商人，并保证玩家重生点始终回到自己的空岛。",
 	"authors": [
-		"Me!"
+		"caojiaming8421"
 	],
 	"contact": {
-		"homepage": "https://fabricmc.net/",
-		"sources": "https://github.com/FabricMC/fabric-example-mod"
+		"homepage": "https://github.com/caojiaming8421/cjm_skyisland",
+		"sources": "https://github.com/caojiaming8421/cjm_skyisland",
+		"issues": "https://github.com/caojiaming8421/cjm_skyisland/issues"
 	},
 	"license": "CC0-1.0",
 	"icon": "assets/cjm_skyisland/icon.png",

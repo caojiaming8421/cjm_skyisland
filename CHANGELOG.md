@@ -10,6 +10,19 @@
 
 ---
 
+## [1.3.6] - 2026-09-30
+
+为对外发布补全模组元数据。
+
+### 变更
+- `fabric.mod.json` 补齐真实信息：显示名改为「空岛纪元」，补上中文简介、作者 `caojiaming8421`，
+  homepage / sources / issues 指向本项目仓库（此前是 fabric-example-mod 的模板默认值）
+- 许可证保持 CC0-1.0（与仓库根目录 LICENSE 一致）
+
+### 环境
+- 对外分发的产物为 `build/libs/cjm_skyisland-<版本>.jar`（`build` 任务 remap 后的成品，非 `-dev.jar`）；
+  玩家侧需自备 Minecraft 26.3 + Fabric Loader ≥0.19.5 + **Fabric API**（`depends` 已声明）
+
 ## [1.3.5] - 2026-09-30
 
 空岛村民外观改为「穿西装的黄种人商人」，刷怪蛋配色同步。
