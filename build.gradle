@@ -20,6 +20,16 @@ loom {
 			sourceSet sourceSets.client
 		}
 	}
+
+	runs {
+		client {
+			// 固定开发环境的玩家名。不指定时 MC 每次启动都会随机生成 "Player###" 玩家，
+			// 其离线 UUID 也随之每次不同 —— 于是「每次进服都是新玩家」，
+			// 按玩家 UUID 记录的存档数据（如初始物资是否已领取）永远匹配不上，表现为每次启动都重发一遍。
+			// 固定名字后 UUID 稳定，进服 / 重开游戏都能复用同一份玩家数据。
+			programArgs "--username", "CJM"
+		}
+	}
 }
 
 fabricApi {
