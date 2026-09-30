@@ -96,7 +96,7 @@ public final class IslandSpawner {
 	}
 
 	/** 按玩家 UUID 派生稳定的空岛中心坐标。 */
-	private static BlockPos islandCenter(final ServerPlayer player) {
+	public static BlockPos islandCenter(final ServerPlayer player) {
 		final long h = player.getUUID().getMostSignificantBits() ^ player.getUUID().getLeastSignificantBits();
 		final int gx = (int) Long.remainderUnsigned(h, 2000);
 		final int gz = (int) Long.remainderUnsigned(h >>> 21, 2000);
@@ -106,7 +106,7 @@ public final class IslandSpawner {
 	}
 
 	/** 空岛重生点：草方块上方的空气格，原版 forced 逻辑才能在此落脚（站在草上）。 */
-	private static BlockPos islandSpawn(final ServerPlayer player) {
+	public static BlockPos islandSpawn(final ServerPlayer player) {
 		return islandCenter(player).above();
 	}
 
@@ -261,6 +261,8 @@ public final class IslandSpawner {
 		buildIsland(player, world);
 		// 岛已存在但村民被杀掉/丢失时也会补齐，保证「每个空岛默认一只」
 		ensureIslandVillager(player, world);
+		// 空岛上的副本传送阵（老存档进来时也会补建）
+		Dungeon.ensureHomePortal(player, world);
 		// 初始物资：每个玩家仅发放一次（用存档数据按 UUID 标记，跨进服 / 重生 / 重启保留）
 		final StarterKitData kitData = world.getDataStorage().computeIfAbsent(STARTER_KIT_TYPE);
 		if (!kitData.has(player.getUUID())) {

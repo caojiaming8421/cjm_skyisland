@@ -14,6 +14,9 @@ import net.minecraft.world.item.CreativeModeTab;
 import net.minecraft.world.item.Item;
 import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.item.SpawnEggItem;
+import net.minecraft.world.level.block.Block;
+import net.minecraft.world.level.block.SoundType;
+import net.minecraft.world.level.block.state.BlockBehaviour;
 
 import com.cjm.skyisland.entity.CjmVillager;
 import com.cjm.skyisland.world.SkyblockWorldPreset;
@@ -51,6 +54,21 @@ public class Cjm_skyisland implements ModInitializer {
 	);
 
 	/**
+	 * 副本传送门方块（id: cjm_skyisland:portal）。
+	 *
+	 * <p>外观复用原版末地传送门贴图（见 assets 下的 blockstate / model），但本身是普通实心方块：
+	 * 玩家站上去触发传送的判定写在 {@link Dungeon} 的每 tick 检测里，不走原版传送门逻辑。
+	 * {@code strength(-1, 3600000)} 让它和基岩一样挖不动，配合事件层拦截做到「传送阵不可被破坏」。
+	 */
+	public static final Block PORTAL_BLOCK = Registry.register(
+		BuiltInRegistries.BLOCK,
+		id("portal"),
+		new Block(BlockBehaviour.Properties.of()
+			.strength(-1.0F, 3600000.0F)
+			.sound(SoundType.GLASS))
+	);
+
+	/**
 	 * 自定义创造模式标签（id: cjm_skyisland:villager_tab）。
 	 * 本版本的 fabric-api 里没有 item-group 模块，无法往原版标签追加条目，
 	 * 所以直接用原版 CreativeModeTab API 建一个自己的标签来放刷怪蛋。
@@ -76,6 +94,8 @@ public class Cjm_skyisland implements ModInitializer {
 		SkyblockWorldPreset.register();
 		// 玩家进服生成专属空岛；并保证「没床时死亡必回空岛」
 		IslandSpawner.register();
+		// 副本空岛：传送阵进出、刷怪、奖励箱、规则限制
+		Dungeon.register();
 	}
 
 	// Makes a new Identifier with the mod's namespace.

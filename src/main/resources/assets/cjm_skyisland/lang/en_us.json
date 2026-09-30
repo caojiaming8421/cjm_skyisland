@@ -3,5 +3,6 @@
   "itemGroup.cjm_skyisland.villager": "Skyblock Villager",
   "item.cjm_skyisland.villager_spawn_egg": "Skyblock Villager Spawn Egg",
   "item.cjm_skyisland.coin": "Skyblock Coin",
-  "entity.cjm_skyisland.villager": "Skyblock Villager"
+  "entity.cjm_skyisland.villager": "Skyblock Villager",
+  "block.cjm_skyisland.portal": "Dungeon Portal"
 }
