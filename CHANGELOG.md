@@ -10,6 +10,17 @@
 
 ---
 
+## [1.5.1] - 2026-09-30
+
+修复 1.5.0 启动即崩溃与传送阵贴图缺失的问题。
+
+### 修复
+- **启动崩溃** `java.lang.ExceptionInInitializerError` → `java.lang.NullPointerException: Block id not set`
+  - 原因：26.x 的 `BlockBehaviour.Properties` 和 `Item.Properties` 一样，必须在构造方块前显式 `setId(ResourceKey<Block>)`
+  - 修复：为传送门方块补上 `PORTAL_ID`（`ResourceKey<Block>`）并 `.setId(PORTAL_ID)`，注册时复用同一个 key
+- **传送阵贴图缺失**：模型原本引用 `minecraft:block/end_portal`，但末地传送门在 26.3 里是专用渲染器、**没有方块贴图**，导致日志报 `Missing textures in model cjm_skyisland:block/portal`
+  - 修复：新增自定义贴图 `assets/cjm_skyisland/textures/block/portal.png`（16x16 深紫星海，模拟末地传送门观感），模型改为引用 `cjm_skyisland:block/portal`
+
 ## [1.5.0] - 2026-09-30
 
 新增「副本空岛」（打怪副本）与配套的传送阵系统。

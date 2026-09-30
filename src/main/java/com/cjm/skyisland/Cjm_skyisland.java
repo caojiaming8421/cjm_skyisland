@@ -60,10 +60,14 @@ public class Cjm_skyisland implements ModInitializer {
 	 * 玩家站上去触发传送的判定写在 {@link Dungeon} 的每 tick 检测里，不走原版传送门逻辑。
 	 * {@code strength(-1, 3600000)} 让它和基岩一样挖不动，配合事件层拦截做到「传送阵不可被破坏」。
 	 */
+	/** 传送门方块 id：26.x 的 BlockBehaviour.Properties 必须显式 setId，否则构造 Block 时抛 "Block id not set" */
+	private static final ResourceKey<Block> PORTAL_ID = ResourceKey.create(Registries.BLOCK, id("portal"));
+
 	public static final Block PORTAL_BLOCK = Registry.register(
 		BuiltInRegistries.BLOCK,
-		id("portal"),
+		PORTAL_ID,
 		new Block(BlockBehaviour.Properties.of()
+			.setId(PORTAL_ID)
 			.strength(-1.0F, 3600000.0F)
 			.sound(SoundType.GLASS))
 	);

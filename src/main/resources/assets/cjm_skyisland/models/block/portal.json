@@ -1,6 +1,6 @@
 {
   "parent": "minecraft:block/cube_all",
   "textures": {
-    "all": "minecraft:block/end_portal"
+    "all": "cjm_skyisland:block/portal"
   }
 }
