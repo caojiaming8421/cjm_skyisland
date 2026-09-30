@@ -10,6 +10,43 @@
 
 ---
 
+## [1.3.0] - 2026-09-30
+
+每个空岛生成时默认附带一只「空岛村民」。
+
+### 新增
+- `IslandSpawner.ensureIslandVillager`：进服时检查所属空岛范围内是否已存在空岛村民，没有则生成一只，站在草方块上并略微偏离岛心（避免与玩家落点重叠）
+- 生成的村民设置为 `setPersistenceRequired()`，不会因玩家远离而消失
+
+### 变更
+- `buildIsland` 改为返回 boolean（表示本次是否新建岛），便于区分「新建岛」与「岛已存在」
+- `ensureIsland` 在放好平台后统一补齐村民：岛已存在但村民被击杀或丢失时也会补一只，保证每个空岛恒定一只
+
+---
+
+## [1.2.0] - 2026-09-30
+
+新增自定义「空岛村民」生物，可在创造模式直接刷出来。
+
+### 新增
+- `CjmVillager` 实体（id `cjm_skyisland:villager`）：继承 `PathfinderMob`，被动生物，会随机闲逛并看向附近玩家
+- `CjmVillagerModel`：村民外形模型（头 / 帽子 / 鼻子 / 身体 / 双臂 / 双腿，64×64 贴图），几何与原版 `VillagerModel` 一致，便于后续改成专属外观与 UV
+- `CjmVillagerRenderer`：绑定模型与贴图，复用原版 `ModelLayers.VILLAGER` 烘焙（无需注册自定义模型层），贴图暂用原版 `villager.png`
+- 刷怪蛋 `cjm_skyisland:villager_spawn_egg`（`new Item.Properties().spawnEgg(CJM_VILLAGER)`）
+- 自定义创造模式标签 `cjm_skyisland:villager_tab`，创造栏里可直接找到刷怪蛋
+
+### 变更
+- 主类 `Cjm_skyisland` 新增实体类型、刷怪蛋、创造栏标签的注册
+- 客户端入口 `Cjm_skyislandClient` 注册渲染器（原先为空模板）
+
+### 修复
+- 修正 26.3 的模型 / 渲染器新 API：`EntityModel<T extends EntityRenderState>`（不再以 `Entity` 为泛型）、`MobRenderer<T, S extends LivingEntityRenderState, M>`、`getTextureLocation(S state)` 接收渲染态而非实体
+- 修正源码集归属：模型与渲染器必须放在 `src/client` 源码集（`src/main` 编译期看不到 `net.minecraft.client.*` 包）
+- 修正 `Registries` 包路径为 `net.minecraft.core.registries.Registries`；`SPAWN_EGGS` 位于 `CreativeModeTabs`（不存在 `ItemGroups` 类）
+- 规避本版本 fabric-api 缺少 item-group 模块（`ItemGroupEvents` 不可用）的问题：改用原版 `CreativeModeTab` API 自建创造栏，不依赖 fabric 物品组扩展
+
+---
+
 ## [1.1.0] - 2026-09-30
 
 首个玩法功能落地：空岛主世界。

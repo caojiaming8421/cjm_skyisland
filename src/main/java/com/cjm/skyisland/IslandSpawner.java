@@ -1,16 +1,19 @@
 package com.cjm.skyisland;
 
+import com.cjm.skyisland.entity.CjmVillager;
 import com.cjm.skyisland.world.SkyblockConfig;
 import net.fabricmc.fabric.api.entity.event.v1.ServerPlayerEvents;
 import net.minecraft.core.BlockPos;
 import net.minecraft.resources.ResourceKey;
 import net.minecraft.server.level.ServerLevel;
 import net.minecraft.server.level.ServerPlayer;
+import net.minecraft.world.entity.EntitySpawnReason;
 import net.minecraft.world.level.Level;
 import net.minecraft.world.level.block.AbstractBedBlock;
 import net.minecraft.world.level.block.Blocks;
 import net.minecraft.world.level.block.state.BlockState;
 import net.minecraft.world.level.storage.LevelData;
+import net.minecraft.world.phys.AABB;
 
 import java.util.Set;
 
@@ -41,11 +44,15 @@ public final class IslandSpawner {
 		return new BlockPos(centerX, SkyblockConfig.ISLAND_Y, centerZ);
 	}
 
-	/** 若岛平台缺失则生成（已存在则跳过）。 */
-	private static void buildIsland(final ServerPlayer player, final ServerLevel world) {
+	/**
+	 * 若岛平台缺失则生成（已存在则跳过）。
+	 *
+	 * @return true 表示这次是「新建岛」（需要连带生成村民）；false 表示岛本来就存在。
+	 */
+	private static boolean buildIsland(final ServerPlayer player, final ServerLevel world) {
 		final BlockPos center = islandCenter(player);
 		if (!world.getBlockState(center).isAir()) {
-			return; // 平台已存在
+			return false; // 平台已存在
 		}
 		final int y = SkyblockConfig.ISLAND_Y;
 		final int cx = center.getX();
@@ -61,6 +68,29 @@ public final class IslandSpawner {
 				world.setBlockAndUpdate(pos.below(2), stone);
 			}
 		}
+		return true;
+	}
+
+	/** 在空岛上生成一只「空岛村民」（每个岛固定一只，已存在则跳过）。 */
+	private static void ensureIslandVillager(final ServerPlayer player, final ServerLevel world) {
+		final BlockPos center = islandCenter(player);
+		final int r = SkyblockConfig.ISLAND_HALF + 2;
+		final AABB box = new AABB(
+				center.getX() - r, center.getY() - 4, center.getZ() - r,
+				center.getX() + r + 1, center.getY() + 6, center.getZ() + r + 1
+		);
+		final boolean exists = !world.getEntitiesOfClass(CjmVillager.class, box, e -> e.isAlive()).isEmpty();
+		if (exists) {
+			return;
+		}
+		// 站在草方块上，稍微偏离岛心，避免和玩家落点重叠
+		final BlockPos spot = center.offset(2, 1, 0);
+		final CjmVillager villager = Cjm_skyisland.CJM_VILLAGER.spawn(world, spot, EntitySpawnReason.EVENT);
+		if (villager == null) {
+			return;
+		}
+		villager.setYRot(world.getRandom().nextFloat() * 360.0F);
+		villager.setPersistenceRequired(); // 不因距离过远而消失
 	}
 
 	/** 把玩家传送上空岛，并把重生点设为岛中心（forced=true，没床时必回此处）。 */
@@ -78,10 +108,12 @@ public final class IslandSpawner {
 		player.teleportTo(world, cx + 0.5, y + 2, cz + 0.5, Set.of(), 0.0f, 0.0f, false);
 	}
 
-	/** 进服时：确保岛存在并把玩家放到岛上、设好重生点。 */
+	/** 进服时：确保岛存在、岛上有一只空岛村民，并把玩家放到岛上、设好重生点。 */
 	public static void ensureIsland(final ServerPlayer player) {
 		final ServerLevel world = (ServerLevel) player.level();
 		buildIsland(player, world);
+		// 岛已存在但村民被杀掉/丢失时也会补齐，保证「每个空岛默认一只」
+		ensureIslandVillager(player, world);
 		teleportToIsland(player, world);
 	}
 
