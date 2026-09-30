@@ -1,21 +1,6 @@
 {
-  "parent": "minecraft:block/block",
+  "parent": "minecraft:block/cube_all",
   "textures": {
-    "portal": "cjm_skyisland:block/portal",
-    "particle": "cjm_skyisland:block/portal"
-  },
-  "elements": [
-    {
-      "from": [0, 0, 0],
-      "to": [16, 1, 16],
-      "faces": {
-        "up": { "texture": "#portal" },
-        "down": { "texture": "#portal" },
-        "north": { "texture": "#portal" },
-        "south": { "texture": "#portal" },
-        "east": { "texture": "#portal" },
-        "west": { "texture": "#portal" }
-      }
-    }
-  ]
+    "all": "cjm_skyisland:block/portal"
+  }
 }
