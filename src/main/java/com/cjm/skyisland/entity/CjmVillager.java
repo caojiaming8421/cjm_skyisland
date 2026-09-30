@@ -36,6 +36,8 @@ import net.minecraft.world.level.Level;
 public class CjmVillager extends PathfinderMob implements Merchant {
 	/** 交易次数上限。设成极大值＝无限次，木头/石头随时能换硬币，不会被锁死。 */
 	private static final int TRADE_MAX_USES = Integer.MAX_VALUE;
+	/** 用硬币换树苗 / 种子时，每笔交易消耗的硬币数量。 */
+	private static final int COIN_COST = 10;
 	/** 交易有效距离的平方（8 格）。超出则判定交易中断、面板自动关闭。 */
 	private static final double TRADE_RANGE_SQR = 64.0D;
 	/** 村民等级，固定 1（本模组没有升级体系）。 */
@@ -86,8 +88,12 @@ public class CjmVillager extends PathfinderMob implements Merchant {
 	}
 
 	/**
-	 * 初期交易表：各树种原木（含下界菌柄）以及石头、圆石，每 1 个换 1 枚硬币。
-	 * 后续要扩展交易（比如用硬币换工具/食物），在这个方法里继续 addOffer 即可。
+	 * 初期交易表：
+	 * <ul>
+	 *   <li>各树种原木（含下界菌柄）以及石头、圆石，每 1 个换 1 枚硬币；</li>
+	 *   <li>反向：10 枚硬币换 1 个树苗 / 种子（全部种类，方便空岛开局补种）。</li>
+	 * </ul>
+	 * 后续要扩展交易（比如用硬币换工具/食物），在这个方法里继续 addOffer / addCoinOffer 即可。
 	 */
 	private static MerchantOffers createTradeOffers() {
 		final MerchantOffers offers = new MerchantOffers();
@@ -111,12 +117,40 @@ public class CjmVillager extends PathfinderMob implements Merchant {
 		addOffer(offers, Items.STONE, coin);
 		addOffer(offers, Items.COBBLESTONE, coin);
 
+		// ============ 反向交易：硬币 -> 树苗 / 种子 ============
+		// 所有树苗：10 硬币换 1 棵
+		addCoinOffer(offers, Items.OAK_SAPLING);
+		addCoinOffer(offers, Items.SPRUCE_SAPLING);
+		addCoinOffer(offers, Items.BIRCH_SAPLING);
+		addCoinOffer(offers, Items.JUNGLE_SAPLING);
+		addCoinOffer(offers, Items.ACACIA_SAPLING);
+		addCoinOffer(offers, Items.DARK_OAK_SAPLING);
+		addCoinOffer(offers, Items.MANGROVE_PROPAGULE); // 红树树苗（ propagule）
+		addCoinOffer(offers, Items.CHERRY_SAPLING);
+		addCoinOffer(offers, Items.PALE_OAK_SAPLING);
+		addCoinOffer(offers, Items.POPLAR_SAPLING);
+		// 所有种子：10 硬币换 1 个
+		addCoinOffer(offers, Items.WHEAT_SEEDS);
+		addCoinOffer(offers, Items.MELON_SEEDS);
+		addCoinOffer(offers, Items.PUMPKIN_SEEDS);
+		addCoinOffer(offers, Items.BEETROOT_SEEDS);
+		addCoinOffer(offers, Items.TORCHFLOWER_SEEDS);
+		addCoinOffer(offers, Items.PITCHER_POD);
+
 		return offers;
 	}
 
 	/** 单条交易：{@code 1 个 cost -> 1 个 result}，无限次、0 经验、不随声望涨价。 */
 	private static void addOffer(MerchantOffers offers, ItemLike cost, ItemStack result) {
 		offers.add(new MerchantOffer(new ItemCost(cost), result.copy(), TRADE_MAX_USES, 0, 0.0F));
+	}
+
+	/** 反向交易：消耗 {@code COIN_COST} 枚硬币，换 1 个 result 物品（树苗 / 种子等）。无限次、0 经验、不涨价。 */
+	private static void addCoinOffer(MerchantOffers offers, ItemLike result) {
+		offers.add(new MerchantOffer(
+				new ItemCost(Cjm_skyisland.COIN, COIN_COST),
+				new ItemStack(result, 1),
+				TRADE_MAX_USES, 0, 0.0F));
 	}
 
 	@Override
