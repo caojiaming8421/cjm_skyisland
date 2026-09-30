@@ -10,6 +10,25 @@
 
 ---
 
+## [1.3.3] - 2026-09-30
+
+修复「把床设为重生点后又拆掉床，重生位置变成随机」。
+
+### 修复
+- 根因：睡床后原版把重生点改成床的位置（`forced=false`）；床被拆后该点失效，原版退回**世界默认出生点**，而虚空世界里那是个随机坐标 —— 于是重生「随机」。原先只挂了 `AFTER_RESPAWN` 兜底，它发生在原版已经把玩家丢到出生点**之后**，时序上慢了一步
+- 改为三层保险，任一层生效都能把重生点拉回空岛：
+  1. `PlayerBlockBreakEvents.AFTER`：床 / 重生锚被拆的那一刻就修好重生点
+  2. `ServerLivingEntityEvents.AFTER_DEATH`：死亡瞬间再校验一次，原版随后的重生流程读到的就是已修好的空岛点（玩家直接回岛，不会再出现「你的床或已充能的重生锚不存在」提示）
+  3. `ServerPlayerEvents.AFTER_RESPAWN`：兜底传送
+- 新增 `isIslandRespawn()`：重生点已是本玩家空岛点时跳过修正，避免每次重生都重复写数据 / 传送
+- 进服逻辑改保守：`ensureIsland` 只在玩家**没有有效锚点**时才传送并设重生点，不再无条件覆盖 —— 顺带修掉「睡了床之后退出重进，重生点被冲掉」的问题
+- 加诊断日志（前缀 `[skyisland]`），记录重生点恢复的目标坐标与触发原因
+
+### 环境
+- `ServerPlayer` 没有 `getServer()`，统一改为从所在维度取（`player.level()` → `ServerLevel.getServer()`）
+
+---
+
 ## [1.3.2] - 2026-09-30
 
 修复进世界时被踢出：`Internal Exception: java.nio.channels.ClosedChannelException`。
