@@ -1,6 +1,7 @@
 package com.cjm.skyisland;
 
 import net.fabricmc.api.ModInitializer;
+import net.fabricmc.fabric.api.object.builder.v1.entity.FabricDefaultAttributeRegistry;
 import net.minecraft.core.Registry;
 import net.minecraft.core.registries.BuiltInRegistries;
 import net.minecraft.core.registries.Registries;
@@ -56,6 +57,8 @@ public class Cjm_skyisland implements ModInitializer {
 
 	@Override
 	public void onInitialize() {
+		// 注册村民的属性（26.x 的 DefaultAttributes 是 ImmutableMap，只能走 Fabric 的属性注册器）
+		FabricDefaultAttributeRegistry.register(CJM_VILLAGER, CjmVillager.createAttributes());
 		// 注册空岛世界预设（主世界虚空 + 自定义群系）
 		SkyblockWorldPreset.register();
 		// 玩家进服生成专属空岛；并保证「没床时死亡必回空岛」

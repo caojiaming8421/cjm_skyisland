@@ -10,6 +10,18 @@
 
 ---
 
+## [1.3.2] - 2026-09-30
+
+修复进世界时被踢出：`Internal Exception: java.nio.channels.ClosedChannelException`。
+
+### 修复
+- `CjmVillager` 新增 `createAttributes()`（`Mob.createMobAttributes().add(Attributes.MOVEMENT_SPEED, 0.5)`）
+- 主类 `onInitialize` 用 `FabricDefaultAttributeRegistry.register(CJM_VILLAGER, CjmVillager.createAttributes())` 注册属性
+- 根因：26.x 的 `DefaultAttributes.SUPPLIERS` 是 `ImmutableMap`，mod 生物无法写入；未注册属性的生物创建时 `AttributeSupplier` 为 null，抛 `NullPointerException`。异常发生在 `PlayerList.placeNewPlayer` → 玩家放置中断 → 服务端断开连接，客户端显示「连接已丢失」
+- 因为先前进入世界并不会生成村民，这个缺陷在 1.3.0 才被暴露
+
+---
+
 ## [1.3.1] - 2026-09-30
 
 修复游戏启动时崩溃：`ExceptionInInitializerError` / `NullPointerException: Item id not set`。
