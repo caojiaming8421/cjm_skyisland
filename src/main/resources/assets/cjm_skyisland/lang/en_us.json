@@ -1,3 +1,6 @@
 {
-  "generator.cjm_skyisland.skyblock": "Skyblock"
+  "generator.cjm_skyisland.skyblock": "Skyblock",
+  "itemGroup.cjm_skyisland.villager": "Skyblock Villager",
+  "item.cjm_skyisland.villager_spawn_egg": "Skyblock Villager Spawn Egg",
+  "entity.cjm_skyisland.villager": "Skyblock Villager"
 }

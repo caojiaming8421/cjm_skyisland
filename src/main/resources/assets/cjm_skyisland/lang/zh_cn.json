@@ -1,3 +1,6 @@
 {
-  "generator.cjm_skyisland.skyblock": "空岛"
+  "generator.cjm_skyisland.skyblock": "空岛",
+  "itemGroup.cjm_skyisland.villager": "空岛村民",
+  "item.cjm_skyisland.villager_spawn_egg": "空岛村民刷怪蛋",
+  "entity.cjm_skyisland.villager": "空岛村民"
 }
