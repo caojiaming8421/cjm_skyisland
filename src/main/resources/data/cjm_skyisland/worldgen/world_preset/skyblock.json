@@ -1,0 +1,47 @@
+{
+  "dimensions": {
+    "minecraft:overworld": {
+      "type": "minecraft:overworld",
+      "generator": {
+        "type": "cjm_skyisland:void",
+        "biome_source": {
+          "type": "cjm_skyisland:void_island",
+          "biomes": [
+            "minecraft:plains",
+            "minecraft:desert",
+            "minecraft:snowy_plains",
+            "minecraft:forest",
+            "minecraft:taiga",
+            "minecraft:savanna",
+            "minecraft:jungle",
+            "minecraft:snowy_taiga",
+            "minecraft:birch_forest",
+            "minecraft:sunflower_plains"
+          ],
+          "sky_biome": "minecraft:the_void"
+        }
+      }
+    },
+    "minecraft:the_end": {
+      "type": "minecraft:the_end",
+      "generator": {
+        "type": "minecraft:noise",
+        "biome_source": {
+          "type": "minecraft:the_end"
+        },
+        "settings": "minecraft:end"
+      }
+    },
+    "minecraft:the_nether": {
+      "type": "minecraft:the_nether",
+      "generator": {
+        "type": "minecraft:noise",
+        "biome_source": {
+          "type": "minecraft:multi_noise",
+          "preset": "minecraft:nether"
+        },
+        "settings": "minecraft:nether"
+      }
+    }
+  }
+}
