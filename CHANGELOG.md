@@ -10,6 +10,27 @@
 
 ---
 
+## [1.3.7] - 2026-09-30
+
+空岛村民开放交易，并新增货币「空岛硬币」。
+
+### 新增
+- 新增物品「空岛硬币」（`cjm_skyisland:coin`）：16x16 圆形金币贴图（金色同心圆 + 左上反光 +
+  中心菱形刻印），已加入「空岛村民」创造栏，中英文名称已补
+- 空岛村民实现原版 `Merchant` 接口，右键直接打开原版村民交易面板（`MerchantMenu`）
+- 初期交易表：各树种原木（橡木 / 云杉 / 白桦 / 丛林 / 金合欢 / 深色橡木 / 红树 / 樱花 /
+  苍白橡木 / 杨木）及下界两种菌柄，外加石头与圆石，每 1 个换 1 枚硬币，无限次不锁死
+
+### 变更
+- 村民交易期间会停下脚步，避免乱走导致超出距离而中断交易
+
+### 环境
+- 26.x 交易 API 已重构：`Merchant` 位于 `world.item.trading` 包；`MerchantOffer` 的代价用
+  `ItemCost`（record）而非 ItemStack；`MerchantOffers` 直接继承 `ArrayList`
+- `Merchant.openTradingScreen()` 是 default 方法且内部自带 `sendMerchantOffers` 同步，
+  所以自定义生物只要实现 `Merchant` 就能复用原版交易面板，不需要 mixin
+- `InteractionResult.sidedSuccess(boolean)` 在 26.x 已移除（改为带挥手源的 record），改用 `SUCCESS`
+
 ## [1.3.6] - 2026-09-30
 
 为对外发布补全模组元数据。

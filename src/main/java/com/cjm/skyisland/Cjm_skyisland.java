@@ -40,6 +40,16 @@ public class Cjm_skyisland implements ModInitializer {
 		new SpawnEggItem(new Item.Properties().spawnEgg(CJM_VILLAGER).setId(CJM_VILLAGER_EGG_ID))
 	);
 
+	/** 硬币物品 id：26.x 的 Item.Properties 必须显式 setId，否则构造 Item 时抛 "Item id not set" */
+	private static final ResourceKey<Item> COIN_ID = ResourceKey.create(Registries.ITEM, id("coin"));
+
+	/** 空岛硬币（id: cjm_skyisland:coin）：村民交易产出的通用货币 */
+	public static final Item COIN = Registry.register(
+		BuiltInRegistries.ITEM,
+		COIN_ID,
+		new Item(new Item.Properties().setId(COIN_ID))
+	);
+
 	/**
 	 * 自定义创造模式标签（id: cjm_skyisland:villager_tab）。
 	 * 本版本的 fabric-api 里没有 item-group 模块，无法往原版标签追加条目，
@@ -51,7 +61,10 @@ public class Cjm_skyisland implements ModInitializer {
 		CreativeModeTab.builder(CreativeModeTab.Row.TOP, 7)
 			.title(Component.translatable("itemGroup.cjm_skyisland.villager"))
 			.icon(() -> new ItemStack(CJM_VILLAGER_EGG))
-			.displayItems((parameters, output) -> output.accept(CJM_VILLAGER_EGG))
+			.displayItems((parameters, output) -> {
+				output.accept(CJM_VILLAGER_EGG);
+				output.accept(COIN);
+			})
 			.build()
 	);
 
