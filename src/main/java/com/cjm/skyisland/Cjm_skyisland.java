@@ -56,8 +56,12 @@ public class Cjm_skyisland implements ModInitializer {
 	/**
 	 * 副本传送门方块（id: cjm_skyisland:portal）。
 	 *
-	 * <p>外观复用原版末地传送门贴图（见 assets 下的 blockstate / model），但本身是普通实心方块：
-	 * 玩家站上去触发传送的判定写在 {@link Dungeon} 的每 tick 检测里，不走原版传送门逻辑。
+	 * <p>手感和原版末地传送门一致：{@code noCollision()} 让它<b>没有实体碰撞</b>——玩家是直接「站进」
+	 * 这个方块里，而不是踩在一块实心方块上面；{@code noOcclusion()} 让相邻的萤石 / 陶釉正常渲染，
+	 * 不会因为这个方块被整体剔除。视觉上是贴着地面的一层薄片（见 {@code models/block/portal.json}），
+	 * 加上四周一圈萤石，观感就是一个「传送门池子」。
+	 *
+	 * <p>传送判定写在 {@link Dungeon} 的每 tick 检测里（检测玩家所在格是不是传送门），不走原版传送门逻辑。
 	 * {@code strength(-1, 3600000)} 让它和基岩一样挖不动，配合事件层拦截做到「传送阵不可被破坏」。
 	 */
 	/** 传送门方块 id：26.x 的 BlockBehaviour.Properties 必须显式 setId，否则构造 Block 时抛 "Block id not set" */
@@ -69,7 +73,10 @@ public class Cjm_skyisland implements ModInitializer {
 		new Block(BlockBehaviour.Properties.of()
 			.setId(PORTAL_ID)
 			.strength(-1.0F, 3600000.0F)
-			.sound(SoundType.GLASS))
+			.sound(SoundType.GLASS)
+			// 无碰撞 + 不遮挡：像末地传送门那样可以站进去，而不是一块实心方块
+			.noCollision()
+			.noOcclusion())
 	);
 
 	/**

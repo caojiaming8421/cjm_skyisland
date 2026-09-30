@@ -535,10 +535,17 @@ public final class Dungeon {
 		player.sendSystemMessage(Component.literal(message));
 	}
 
-	/** 玩家脚下踩的是不是传送门方块。 */
+	/**
+	 * 玩家是不是站在传送门里。
+	 *
+	 * <p>传送门方块是 {@code noCollision()} 的（像末地传送门），玩家踩的是它下面那一格地面，
+	 * 身体则处在传送门方块所在格 —— 所以判定要看「玩家所在格」，不能再只看脚下方块。
+	 * 保留脚下那一格的判断是为了兼容仍在旧存档里的老传送阵。
+	 */
 	private static boolean isOnPortal(final ServerLevel world, final ServerPlayer player) {
-		final BlockPos below = new BlockPos(player.getBlockX(), player.getBlockY() - 1, player.getBlockZ());
-		return world.getBlockState(below).is(Cjm_skyisland.PORTAL_BLOCK);
+		final BlockPos feet = player.blockPosition();
+		return world.getBlockState(feet).is(Cjm_skyisland.PORTAL_BLOCK)
+				|| world.getBlockState(feet.below()).is(Cjm_skyisland.PORTAL_BLOCK);
 	}
 
 	/** 该坐标是否属于「玩家自己岛上那座传送阵」的 4x4 范围。 */
