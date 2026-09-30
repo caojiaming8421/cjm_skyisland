@@ -12,6 +12,9 @@ import net.minecraft.server.MinecraftServer;
 import net.minecraft.server.level.ServerLevel;
 import net.minecraft.server.level.ServerPlayer;
 import net.minecraft.world.entity.EntitySpawnReason;
+import net.minecraft.network.chat.Component;
+import net.minecraft.world.item.ItemStack;
+import net.minecraft.world.item.Items;
 import net.minecraft.world.level.Level;
 import net.minecraft.world.level.block.AbstractBedBlock;
 import net.minecraft.world.level.block.Blocks;
@@ -123,6 +126,15 @@ public final class IslandSpawner {
 		villager.setPersistenceRequired(); // 不因距离过远而消失
 	}
 
+	/** 新玩家首次生成空岛时发放的初始物资：1 个橡树树苗 + 4 个骨粉。只在新岛建成时调用一次。 */
+	private static void giveStarterKit(final ServerPlayer player) {
+		player.getInventory().add(new ItemStack(Items.OAK_SAPLING, 1));
+		player.getInventory().add(new ItemStack(Items.BONE_MEAL, 4));
+		player.inventoryMenu.broadcastChanges();
+		player.sendSystemMessage(Component.literal("你收到了初始物资：橡树树苗 ×1、骨粉 ×4"));
+		LOGGER.info("[skyisland] 向 {} 发放初始物资（橡树树苗 ×1、骨粉 ×4）", player.getName().getString());
+	}
+
 	/** 把重生点设为自己的空岛（forced=true，没床时必回此处）。只写数据，不传送。 */
 	private static void setIslandRespawn(final ServerPlayer player, final ServerLevel world) {
 		final BlockPos spawn = islandSpawn(player);
@@ -188,7 +200,7 @@ public final class IslandSpawner {
 		LOGGER.info("[skyisland] 触发原因：{}", reason);
 	}
 
-	/** 进服时：确保岛存在、岛上有一只空岛村民；没有有效重生点时才把玩家放到岛上并设重生点。 */
+	/** 进服时：确保岛存在、岛上有一只空岛村民；新建空岛时发放初始物资（橡树树苗×1 + 骨粉×4）；没有有效重生点时才把玩家放到岛上并设重生点。 */
 	public static void ensureIsland(final ServerPlayer player) {
 		final MinecraftServer server = serverOf(player);
 		if (server == null) {
@@ -198,9 +210,13 @@ public final class IslandSpawner {
 		if (world == null) {
 			return;
 		}
-		buildIsland(player, world);
+		final boolean newIsland = buildIsland(player, world);
 		// 岛已存在但村民被杀掉/丢失时也会补齐，保证「每个空岛默认一只」
 		ensureIslandVillager(player, world);
+		// 首次生成空岛（平台新建）时发放初始物资，之后进服不再重复给
+		if (newIsland) {
+			giveStarterKit(player);
+		}
 		// 已有有效锚点（比如上次睡的床还在）就不动他，避免每次进服都把重生点冲掉
 		if (!hasValidAnchor(player)) {
 			teleportToIsland(player, world);
