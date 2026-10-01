@@ -87,14 +87,14 @@ public class Cjm_skyisland implements ModInitializer {
 	/** 难度入口方块 id：26.x 的 BlockBehaviour.Properties 必须显式 setId。 */
 	private static final ResourceKey<Block> DUNGEON_CORE_ID = ResourceKey.create(Registries.BLOCK, id("dungeon_core"));
 
-	/** 副本难度入口（硬币祭坛，id: cjm_skyisland:dungeon_core）：放在空岛传送阵上方，右键选难度。 */
+	/** 副本入口石碑（id: cjm_skyisland:dungeon_core）：放在玩家空岛上，1×3 石碑造型，右键选难度并进入副本。 */
 	public static final Block DUNGEON_CORE_BLOCK = Registry.register(
 		BuiltInRegistries.BLOCK,
 		DUNGEON_CORE_ID,
 		new DungeonCoreBlock(BlockBehaviour.Properties.of()
 			.setId(DUNGEON_CORE_ID)
 			.strength(-1.0F, 3600000.0F)
-			.sound(SoundType.METAL)
+			.sound(SoundType.STONE)
 			.noOcclusion())
 	);
 

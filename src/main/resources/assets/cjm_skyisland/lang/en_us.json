@@ -5,6 +5,6 @@
   "item.cjm_skyisland.coin": "Skyblock Coin",
   "entity.cjm_skyisland.villager": "Skyblock Villager",
   "block.cjm_skyisland.portal": "Dungeon Portal",
-  "block.cjm_skyisland.dungeon_core": "Dungeon Difficulty Core",
-  "item.cjm_skyisland.dungeon_core": "Dungeon Difficulty Core"
+  "block.cjm_skyisland.dungeon_core": "Dungeon Entrance Stele",
+  "item.cjm_skyisland.dungeon_core": "Dungeon Entrance Stele"
 }

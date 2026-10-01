@@ -5,6 +5,6 @@
   "item.cjm_skyisland.coin": "空岛硬币",
   "entity.cjm_skyisland.villager": "空岛村民",
   "block.cjm_skyisland.portal": "副本传送门",
-  "block.cjm_skyisland.dungeon_core": "副本难度入口",
-  "item.cjm_skyisland.dungeon_core": "副本难度入口"
+  "block.cjm_skyisland.dungeon_core": "副本入口石碑",
+  "item.cjm_skyisland.dungeon_core": "副本入口石碑"
 }

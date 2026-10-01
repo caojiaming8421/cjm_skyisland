@@ -10,6 +10,24 @@
 
 ---
 
+## [1.5.6] - 2026-10-01
+
+去掉玩家空岛上的 4×4 副本传送阵，保留并改为「副本入口石碑」（`dungeon_core`）作为唯一入口：1×3 高石碑造型，带自定义石碑贴图。
+
+### 变更
+- **移除玩家空岛上的 4×4 副本传送阵**：`Dungeon.ensureEntrance`（原 `ensureHomePortal`）不再铺设萤石/陶釉/传送门，只在空岛固定位置生成 `dungeon_core` 石碑
+  - 旧存档里已建好的空岛传送门会留在原地，但不再触发进入；它们仍是不可破坏方块
+- **副本入口石碑成为唯一入口**：右键石碑打开难度 GUI → 选难度 → 扣硬币 → 直接进副本，流程与 1.5.5 的 `requestEnter` 一致
+  - 删除 `Dungeon.selectedDiff` 与 `isHomePortalFootprint`，`handlePlayer` 只负责「副本中央传送阵 → 回家」的回程逻辑
+- **石碑模型改为 1×3 石碑造型**（`models/block/dungeon_core.json`）：基座 + 碑身 + 碑顶共 48 格高，正面贴 `dungeon_core.png`（金币浮雕石碑），其余面贴 `dungeon_core_side.png`（石质纹理）
+- **石碑音效改为石头**：`SoundType.METAL` → `SoundType.STONE`
+- 中英文 lang：`block/item.cjm_skyisland.dungeon_core` 改为「副本入口石碑」/ "Dungeon Entrance Stele"
+
+### 说明
+- 副本中央的 4×4 回程传送阵保留不变，玩家仍站上去回空岛
+- 停留限制（最短 5 分钟 / 最长 20 分钟强制淘汰）保持不变
+- mod 版本号 1.5.5 → 1.5.6
+
 ## [1.5.5] - 2026-10-01
 
 副本进入改为「硬币解锁 + 三档难度」，并移除 30 分钟进入冷却。

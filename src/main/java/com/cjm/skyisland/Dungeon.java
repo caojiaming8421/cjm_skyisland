@@ -59,14 +59,14 @@ import java.util.concurrent.ConcurrentHashMap;
  *
  * <p>玩法要点：
  * <ul>
- *   <li>玩家自己的空岛上固定生成一座 4x4 传送阵（{@code #AA# / A**A / A**A / #AA#}）和一座
- *       悬在传送阵正上方 2 格的难度入口（硬币祭坛）。右键祭坛打开难度界面，消耗硬币选难度后进入副本；
- *       副本正中还有一座同样的传送阵，站上去回自己的空岛。</li>
+ *   <li>玩家自己的空岛上固定生成一座<b>副本入口石碑</b>（{@code cjm_skyisland:dungeon_core}）。
+ *       右键石碑打开难度界面，消耗硬币选难度后立即进入副本；石碑造型为 1×3 高石碑，正面有金币浮雕。
+ *       副本正中仍有一座 4×4 传送阵，站上去回自己的空岛。</li>
  *   <li>三档难度：简单（20 硬币 / 20 怪 / 石质装备）、普通（50 硬币 / 50 怪 / 铁质装备）、
  *       困难（100 硬币 / 100 怪 / 钻石装备）。每次进入都会<b>重置</b>副本：清掉旧怪后按难度刷满，
  *       并重新随机填充 4 个奖励箱。</li>
  *   <li>进入不再有冷却（靠硬币门槛限制）；进入后必须待满 5 分钟才能走；超过 20 分钟不走就自动死亡。</li>
- *   <li>副本内玩家不能放置、不能破坏任何方块（传送阵与祭坛本身也拆不掉）。</li>
+ *   <li>副本内玩家不能放置、不能破坏任何方块（中央传送阵与石碑本身也拆不掉）。</li>
  * </ul>
  *
  * <p>「怪物不畏惧阳光」的实现：原版 {@code isSunBurnTick()} 会检测
@@ -88,9 +88,9 @@ public final class Dungeon {
 	};
 	/** 陶釉用哪一种：淡蓝色陶釉（26.x 里陶釉是 ColorCollection，按颜色取）。 */
 	private static final BlockState GLAZED_STATE = Blocks.GLAZED_TERRACOTTA.lightBlue().defaultBlockState();
-	/** 玩家空岛上传送阵相对岛心的偏移（放在西南角，避开玩家落点和村民）。 */
-	private static final int HOME_PORTAL_OFF_X = -4;
-	private static final int HOME_PORTAL_OFF_Z = -4;
+	/** 玩家空岛上副本入口石碑相对岛心的偏移（放在西南角，避开玩家落点和村民）。 */
+	private static final int ENTRANCE_OFF_X = -4;
+	private static final int ENTRANCE_OFF_Z = -4;
 
 	/** 传送阵触发的防抖间隔（毫秒），避免一次传送被反复判定。 */
 	private static final long PORTAL_DEBOUNCE_MS = 1500L;
@@ -165,8 +165,6 @@ public final class Dungeon {
 	private static final Map<UUID, Long> lastDenyMessage = new ConcurrentHashMap<>();
 	/** tick 计数，用于周期性维护。 */
 	private static int tickCounter = 0;
-	/** 玩家 UUID -> 已在祭坛选好的难度（0/1/2）。踩玩家岛传送门进副本时复用，进入后清除。 */
-	private static final Map<UUID, Integer> selectedDiff = new ConcurrentHashMap<>();
 	/** 当前副本平台对应的怪物目标数量（由最近一次进入的难度决定），用于周期性维护。 */
 	private static int currentMobTarget = DungeonConfig.MOB_COUNT;
 
@@ -195,27 +193,20 @@ public final class Dungeon {
 
 	// ==================== 建造 ====================
 
-	/** 玩家进服建岛后调用：在他的空岛上补一座传送阵（已存在则跳过）。 */
-	public static void ensureHomePortal(final ServerPlayer player, final ServerLevel world) {
+	/** 玩家进服建岛后调用：在他的空岛上补一座副本入口石碑（已存在则跳过）。 */
+	public static void ensureEntrance(final ServerPlayer player, final ServerLevel world) {
 		final BlockPos center = IslandSpawner.islandCenter(player);
-		final BlockPos origin = new BlockPos(
-				center.getX() + HOME_PORTAL_OFF_X,
+		final BlockPos pos = new BlockPos(
+				center.getX() + ENTRANCE_OFF_X,
 				SkyblockConfig.ISLAND_Y + 1,
-				center.getZ() + HOME_PORTAL_OFF_Z
+				center.getZ() + ENTRANCE_OFF_Z
 		);
-		// 传送阵可能跨到相邻区块，先加载再判定：未加载时 getBlockState 会误报空气而重复铺设
-		loadChunkAt(world, origin);
-		loadChunkAt(world, origin.offset(PORTAL_SIZE - 1, 0, PORTAL_SIZE - 1));
-		// 中心 2x2 已经是传送门方块就说明建过了
-		if (world.getBlockState(origin.offset(1, 0, 1)).is(Cjm_skyisland.PORTAL_BLOCK)) {
+		loadChunkAt(world, pos);
+		if (world.getBlockState(pos).is(Cjm_skyisland.DUNGEON_CORE_BLOCK)) {
 			return;
 		}
-		placePortal(world, origin);
-		// 难度入口（硬币祭坛）放在传送阵中心正上方 2 格：传送门在 Y=ISLAND_Y+1，头上 2 格即 +2
-		final BlockPos corePos = origin.offset(1, 2, 1);
-		loadChunkAt(world, corePos);
-		world.setBlockAndUpdate(corePos, Cjm_skyisland.DUNGEON_CORE_BLOCK.defaultBlockState());
-		LOGGER.info("[skyisland] 已在 {} 的空岛上生成副本传送阵 {}", player.getName().getString(), origin.toShortString());
+		world.setBlockAndUpdate(pos, Cjm_skyisland.DUNGEON_CORE_BLOCK.defaultBlockState());
+		LOGGER.info("[skyisland] 已在 {} 的空岛上生成副本入口石碑 {}", player.getName().getString(), pos.toShortString());
 	}
 
 	/** 确保某个坐标所在区块已加载（未加载时 getBlockState 会误报空气）。 */
@@ -499,9 +490,8 @@ public final class Dungeon {
 			deny(player, "硬币不足：需要 " + d.cost + " 个，你只有 " + have + " 个");
 			return;
 		}
-		// 扣除硬币（进入即消耗，selectedDiff 一并清掉，避免踩传送门免费再进）
+		// 扣除硬币（选难度即进入，没有独立传送阵再扣费的问题）
 		removeCoins(player, d.cost);
-		selectedDiff.remove(player.getUUID());
 		enterDungeon(player, world, System.currentTimeMillis(), diff);
 		player.sendSystemMessage(Component.literal("已扣除 " + d.cost + " 硬币，进入「" + d.nameZh + "」难度。"));
 	}
@@ -602,18 +592,6 @@ public final class Dungeon {
 				|| world.getBlockState(feet.above()).is(Cjm_skyisland.PORTAL_BLOCK);
 	}
 
-	/** 该坐标是否属于「玩家自己岛上那座传送阵」的 4x4 范围。 */
-	private static boolean isHomePortalFootprint(final ServerPlayer player, final BlockPos pos) {
-		if (pos.getY() != SkyblockConfig.ISLAND_Y + 1) {
-			return false;
-		}
-		final BlockPos center = IslandSpawner.islandCenter(player);
-		final int ox = center.getX() + HOME_PORTAL_OFF_X;
-		final int oz = center.getZ() + HOME_PORTAL_OFF_Z;
-		return pos.getX() >= ox && pos.getX() <= ox + PORTAL_SIZE - 1
-				&& pos.getZ() >= oz && pos.getZ() <= oz + PORTAL_SIZE - 1;
-	}
-
 	// ==================== 每 tick 处理 ====================
 
 	private static void onEndTick(final MinecraftServer server) {
@@ -641,7 +619,7 @@ public final class Dungeon {
 			player.hurt(player.damageSources().generic(), Float.MAX_VALUE);
 			return;
 		}
-		// 2) 传送阵
+		// 2) 副本中央传送阵 -> 回家（玩家岛上已无传送阵，进入副本靠右键石碑选择难度）
 		if (!isOnPortal(world, player)) {
 			return;
 		}
@@ -651,16 +629,7 @@ public final class Dungeon {
 		}
 		lastPortalUse.put(id, now);
 		if (isInDungeon(player.getBlockX(), player.getBlockZ())) {
-			tryReturn(player, world, now); // 副本中央传送阵 -> 回家
-		} else {
-			// 自己岛上的传送阵：必须先通过祭坛选过难度（已付费），否则提示去选
-			final Integer diff = selectedDiff.get(player.getUUID());
-			if (diff == null) {
-				deny(player, "请先右键头顶的硬币祭坛选择难度");
-			} else {
-				selectedDiff.remove(player.getUUID()); // 免费复用已付费的难度，进入后失效
-				enterDungeon(player, world, now, diff);
-			}
+			tryReturn(player, world, now);
 		}
 	}
 
@@ -679,9 +648,8 @@ public final class Dungeon {
 				deny(serverPlayer, "副本空岛内不能破坏方块");
 				return false;
 			}
-			if (state.is(Cjm_skyisland.PORTAL_BLOCK) || state.is(Cjm_skyisland.DUNGEON_CORE_BLOCK)
-					|| isHomePortalFootprint(serverPlayer, pos)) {
-				deny(serverPlayer, "传送阵与祭坛无法被破坏");
+			if (state.is(Cjm_skyisland.PORTAL_BLOCK) || state.is(Cjm_skyisland.DUNGEON_CORE_BLOCK)) {
+				deny(serverPlayer, "副本入口石碑与中央传送阵无法被破坏");
 				return false;
 			}
 			return true;
