@@ -99,6 +99,8 @@ public final class Dungeon {
 	private static final long DENY_MESSAGE_THROTTLE_MS = 10_000L;
 	/** 每多少 tick 做一次怪物维护（补抗火 / 数量兜底）。5 秒一次。 */
 	private static final int MOB_MAINTENANCE_INTERVAL = 100;
+	/** 进入副本后连续补扫地面掉落物的 tick 数（10 秒），覆盖平台区块逐步加载完成的过程。 */
+	private static final int DROP_CLEANUP_TICKS = 200;
 
 	// 奖励池（石/铁/钻石）已迁移到 DungeonConfig.STONE_LOOT / IRON_LOOT / DIAMOND_LOOT，按难度选用。
 
@@ -168,6 +170,15 @@ public final class Dungeon {
 	private static int tickCounter = 0;
 	/** 当前副本平台对应的怪物目标数量（由最近一次进入的难度决定），用于周期性维护。 */
 	private static int currentMobTarget = DungeonConfig.MOB_COUNT;
+	/**
+	 * 进入副本后还需继续补扫掉落物的剩余 tick 数。
+	 *
+	 * <p>平台跨 7×7 个区块，进入时强制预载区块拿不到实体（ProtoChunk 不带实体），
+	 * 所以改成「玩家已在副本内、区块真正加载完」之后，接下来若干 tick 反复补扫，确保清干净。
+	 */
+	private static int pendingDropCleanup = 0;
+	/** 延时补扫阶段累计清掉的掉落物数量，用于日志。 */
+	private static int deferredDropRemoved = 0;
 
 	private Dungeon() {
 	}
@@ -367,7 +378,8 @@ public final class Dungeon {
 	/** 每次开启：加载平台区块 -> 清掉旧怪与地面掉落物 -> 按难度刷怪 -> 按难度重填奖励箱。 */
 	private static void resetDungeon(final ServerLevel world, final DungeonData data, final int diff) {
 		final DungeonConfig.Difficulty d = DungeonConfig.DIFFICULTIES[diff];
-		// 必须先加载平台所在的所有区块，否则 getEntitiesOfClass 只能扫到已加载区块，会漏掉掉落物/怪物
+		// 先把平台区块拉到 FULL，保证后面的刷怪 / 填箱能落地（区块没加载时 addFreshEntity 会静默丢弃）
+		// 注意：这样拿到的区块里的实体还没挂进世界，所以掉落物清不掉，靠进入后的延时补扫兜底
 		for (int sx = SectionPos.blockToSectionCoord(DungeonConfig.MIN_X); sx <= SectionPos.blockToSectionCoord(DungeonConfig.MAX_X); sx++) {
 			for (int sz = SectionPos.blockToSectionCoord(DungeonConfig.MIN_Z); sz <= SectionPos.blockToSectionCoord(DungeonConfig.MAX_Z); sz++) {
 				world.getChunkSource().getChunk(sx, sz, ChunkStatus.FULL, true);
@@ -381,17 +393,26 @@ public final class Dungeon {
 			mobRemoved++;
 		}
 		// 清掉上一轮残留的地面掉落物（玩家死亡掉落 / 怪物掉落 / 箱子被掏后的散落物）
-		int dropRemoved = 0;
-		for (final ItemEntity drop : world.getEntitiesOfClass(ItemEntity.class, box, e -> e.isAlive())) {
-			drop.discard();
-			dropRemoved++;
-		}
-		if (mobRemoved > 0 || dropRemoved > 0) {
-			LOGGER.info("[skyisland] 副本重置：清掉 {} 只旧怪、{} 个地面掉落物", mobRemoved, dropRemoved);
-		}
+		final int dropRemoved = clearDrops(world);
+		LOGGER.info("[skyisland] 副本重置：清掉 {} 只旧怪、{} 个地面掉落物（即时阶段）", mobRemoved, dropRemoved);
 		currentMobTarget = d.mobCount;
 		spawnMobs(world, d.mobCount);
 		refillChests(world, data, d.loot);
+	}
+
+	/**
+	 * 清掉副本范围内的所有地面掉落物，返回清掉的数量。
+	 *
+	 * <p>注意：只能扫到<b>已加载且实体已入世界</b>的区块，所以进入副本时会即时清一次，
+	 * 之后再靠 {@link #pendingDropCleanup} 在若干 tick 内补扫，覆盖区块逐步加载完成的过程。
+	 */
+	private static int clearDrops(final ServerLevel world) {
+		int removed = 0;
+		for (final ItemEntity drop : world.getEntitiesOfClass(ItemEntity.class, regionBox(), e -> e.isAlive())) {
+			drop.discard();
+			removed++;
+		}
+		return removed;
 	}
 
 	/** 按给定数量刷怪：僵尸 / 小僵尸 / 骷髅弓箭手，各约三分之一。 */
@@ -566,6 +587,9 @@ public final class Dungeon {
 		// randomSpawnPos 返回的是「地板上方那一格」，玩家脚部正好落在这一格，直接踩在石地板上
 		player.teleportTo(world, floor.getX() + 0.5, floor.getY(), floor.getZ() + 0.5,
 				Set.of(), player.getYRot(), player.getXRot(), false);
+		// 传送之后再排一轮延时补扫：玩家已在副本内，平台区块会在这几秒里加载完，届时掉落物才扫得到
+		pendingDropCleanup = DROP_CLEANUP_TICKS;
+		deferredDropRemoved = 0;
 		player.sendSystemMessage(Component.literal("你已进入副本空岛（" + d.nameZh + "）：" + d.mobCount + " 只怪物、4 个奖励箱。"));
 		player.sendSystemMessage(Component.literal("最少停留 5 分钟才能从中央传送阵离开，20 分钟后会被强制淘汰。"));
 		LOGGER.info("[skyisland] {} 进入副本空岛（{} 难度，落点 {}）", player.getName().getString(), d.nameZh, floor.toShortString());
@@ -633,6 +657,14 @@ public final class Dungeon {
 			handlePlayer(player, world, now);
 		}
 		tickCounter++;
+		if (pendingDropCleanup > 0) {
+			pendingDropCleanup--;
+			deferredDropRemoved += clearDrops(world);
+			if (pendingDropCleanup == 0) {
+				LOGGER.info("[skyisland] 副本掉落物补扫结束：{} tick 内共清掉 {} 个地面掉落物",
+						DROP_CLEANUP_TICKS, deferredDropRemoved);
+			}
+		}
 		if (tickCounter % MOB_MAINTENANCE_INTERVAL == 0) {
 			maintainMobs(world);
 		}
