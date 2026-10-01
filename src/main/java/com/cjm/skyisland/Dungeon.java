@@ -26,6 +26,7 @@ import net.minecraft.world.effect.MobEffects;
 import net.minecraft.world.entity.EntitySpawnReason;
 import net.minecraft.world.entity.EntityTypes;
 import net.minecraft.world.entity.Mob;
+import net.minecraft.world.entity.item.ItemEntity;
 import net.minecraft.world.entity.monster.Monster;
 import net.minecraft.world.entity.monster.skeleton.Skeleton;
 import net.minecraft.world.entity.monster.zombie.Zombie;
@@ -363,13 +364,17 @@ public final class Dungeon {
 
 	// ==================== 重置：怪物与奖励箱 ====================
 
-	/** 每次开启：清掉旧怪 -> 按难度刷怪 -> 按难度重填奖励箱。 */
+	/** 每次开启：清掉旧怪与地面掉落物 -> 按难度刷怪 -> 按难度重填奖励箱。 */
 	private static void resetDungeon(final ServerLevel world, final DungeonData data, final int diff) {
 		final DungeonConfig.Difficulty d = DungeonConfig.DIFFICULTIES[diff];
 		final AABB box = regionBox();
 		// 清掉上一轮残留的怪物
 		for (final Monster old : world.getEntitiesOfClass(Monster.class, box, mob -> mob.isAlive())) {
 			old.discard();
+		}
+		// 清掉上一轮残留的地面掉落物（玩家死亡掉落 / 怪物掉落 / 箱子被掏后的散落物）
+		for (final ItemEntity drop : world.getEntitiesOfClass(ItemEntity.class, box, e -> e.isAlive())) {
+			drop.discard();
 		}
 		currentMobTarget = d.mobCount;
 		spawnMobs(world, d.mobCount);
