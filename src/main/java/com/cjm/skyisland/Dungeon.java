@@ -59,12 +59,14 @@ import java.util.concurrent.ConcurrentHashMap;
  *
  * <p>玩法要点：
  * <ul>
- *   <li>玩家自己的空岛上固定生成一座 4x4 传送阵（{@code #AA# / A**A / A**A / #AA#}），
- *       站上去进入副本；副本正中还有一座同样的传送阵，站上去回自己的空岛。</li>
- *   <li>每次进入都会<b>重置</b>副本：清掉旧怪后重新刷满 100 只（僵尸 / 小僵尸 / 骷髅弓箭手），
- *       并重新随机填充 4 个奖励箱的战利品（铁制武器与工具）。</li>
- *   <li>同一玩家 30 分钟冷却；进入后必须待满 5 分钟才能走；超过 20 分钟不走就自动死亡。</li>
- *   <li>副本内玩家不能放置、不能破坏任何方块（传送阵本身也拆不掉）。</li>
+ *   <li>玩家自己的空岛上固定生成一座 4x4 传送阵（{@code #AA# / A**A / A**A / #AA#}）和一座
+ *       悬在传送阵正上方 2 格的难度入口（硬币祭坛）。右键祭坛打开难度界面，消耗硬币选难度后进入副本；
+ *       副本正中还有一座同样的传送阵，站上去回自己的空岛。</li>
+ *   <li>三档难度：简单（20 硬币 / 20 怪 / 石质装备）、普通（50 硬币 / 50 怪 / 铁质装备）、
+ *       困难（100 硬币 / 100 怪 / 钻石装备）。每次进入都会<b>重置</b>副本：清掉旧怪后按难度刷满，
+ *       并重新随机填充 4 个奖励箱。</li>
+ *   <li>进入不再有冷却（靠硬币门槛限制）；进入后必须待满 5 分钟才能走；超过 20 分钟不走就自动死亡。</li>
+ *   <li>副本内玩家不能放置、不能破坏任何方块（传送阵与祭坛本身也拆不掉）。</li>
  * </ul>
  *
  * <p>「怪物不畏惧阳光」的实现：原版 {@code isSunBurnTick()} 会检测
@@ -97,18 +99,7 @@ public final class Dungeon {
 	/** 每多少 tick 做一次怪物维护（补抗火 / 数量兜底）。5 秒一次。 */
 	private static final int MOB_MAINTENANCE_INTERVAL = 100;
 
-	/** 奖励池：铁制武器与工具（外加铁盔甲，保证 4 个箱子能分出不同组合）。 */
-	private static final List<Item> IRON_LOOT = List.of(
-			Items.IRON_SWORD,
-			Items.IRON_AXE,
-			Items.IRON_PICKAXE,
-			Items.IRON_SHOVEL,
-			Items.IRON_HOE,
-			Items.IRON_HELMET,
-			Items.IRON_CHESTPLATE,
-			Items.IRON_LEGGINGS,
-			Items.IRON_BOOTS
-	);
+	// 奖励池（石/铁/钻石）已迁移到 DungeonConfig.STONE_LOOT / IRON_LOOT / DIAMOND_LOOT，按难度选用。
 
 	// ==================== 存档数据 ====================
 
@@ -174,6 +165,10 @@ public final class Dungeon {
 	private static final Map<UUID, Long> lastDenyMessage = new ConcurrentHashMap<>();
 	/** tick 计数，用于周期性维护。 */
 	private static int tickCounter = 0;
+	/** 玩家 UUID -> 已在祭坛选好的难度（0/1/2）。踩玩家岛传送门进副本时复用，进入后清除。 */
+	private static final Map<UUID, Integer> selectedDiff = new ConcurrentHashMap<>();
+	/** 当前副本平台对应的怪物目标数量（由最近一次进入的难度决定），用于周期性维护。 */
+	private static int currentMobTarget = DungeonConfig.MOB_COUNT;
 
 	private Dungeon() {
 	}
@@ -216,6 +211,10 @@ public final class Dungeon {
 			return;
 		}
 		placePortal(world, origin);
+		// 难度入口（硬币祭坛）放在传送阵中心正上方 2 格：传送门在 Y=ISLAND_Y+1，头上 2 格即 +2
+		final BlockPos corePos = origin.offset(1, 2, 1);
+		loadChunkAt(world, corePos);
+		world.setBlockAndUpdate(corePos, Cjm_skyisland.DUNGEON_CORE_BLOCK.defaultBlockState());
 		LOGGER.info("[skyisland] 已在 {} 的空岛上生成副本传送阵 {}", player.getName().getString(), origin.toShortString());
 	}
 
@@ -362,21 +361,23 @@ public final class Dungeon {
 
 	// ==================== 重置：怪物与奖励箱 ====================
 
-	/** 每次开启：清掉旧怪 -> 刷满 100 只 -> 重填奖励箱。 */
-	private static void resetDungeon(final ServerLevel world, final DungeonData data) {
+	/** 每次开启：清掉旧怪 -> 按难度刷怪 -> 按难度重填奖励箱。 */
+	private static void resetDungeon(final ServerLevel world, final DungeonData data, final int diff) {
+		final DungeonConfig.Difficulty d = DungeonConfig.DIFFICULTIES[diff];
 		final AABB box = regionBox();
 		// 清掉上一轮残留的怪物
 		for (final Monster old : world.getEntitiesOfClass(Monster.class, box, mob -> mob.isAlive())) {
 			old.discard();
 		}
-		spawnMobs(world);
-		refillChests(world, data);
+		currentMobTarget = d.mobCount;
+		spawnMobs(world, d.mobCount);
+		refillChests(world, data, d.loot);
 	}
 
-	/** 固定刷 100 只：僵尸 / 小僵尸 / 骷髅弓箭手，各约三分之一。 */
-	private static void spawnMobs(final ServerLevel world) {
+	/** 按给定数量刷怪：僵尸 / 小僵尸 / 骷髅弓箭手，各约三分之一。 */
+	private static void spawnMobs(final ServerLevel world, final int mobCount) {
 		final RandomSource rand = world.getRandom();
-		for (int i = 0; i < DungeonConfig.MOB_COUNT; i++) {
+		for (int i = 0; i < mobCount; i++) {
 			final BlockPos spot = randomFloorPos(rand);
 			final int kind = i % 3;
 			if (kind == 2) {
@@ -436,11 +437,11 @@ public final class Dungeon {
 	 * 重填 4 个奖励箱：打乱铁制装备池后平均分配，保证每个箱子的战利品互不相同。
 	 * 池子只有 9 件、箱子 4 个，所以按「每个 2 件、最后一个拿剩下的 3 件」分配。
 	 */
-	private static void refillChests(final ServerLevel world, final DungeonData data) {
+	private static void refillChests(final ServerLevel world, final DungeonData data, final List<Item> loot) {
 		if (data.chests.isEmpty()) {
 			return;
 		}
-		final List<Item> pool = new ArrayList<>(IRON_LOOT);
+		final List<Item> pool = new ArrayList<>(loot);
 		Collections.shuffle(pool);
 		final int perChest = pool.size() / data.chests.size();
 		int cursor = 0;
@@ -463,8 +464,8 @@ public final class Dungeon {
 		final List<Monster> mobs = world.getEntitiesOfClass(Monster.class, regionBox(), mob -> mob.isAlive());
 		for (int i = 0; i < mobs.size(); i++) {
 			final Monster mob = mobs.get(i);
-			if (i >= DungeonConfig.MOB_COUNT) {
-				mob.discard(); // 超出 100 只的部分清掉，保持固定数量
+			if (i >= currentMobTarget) {
+				mob.discard(); // 超出目标数量的部分清掉，保持固定数量
 				continue;
 			}
 			if (!mob.hasEffect(MobEffects.FIRE_RESISTANCE)) {
@@ -476,27 +477,79 @@ public final class Dungeon {
 
 	// ==================== 进出副本 ====================
 
-	private static void tryEnter(final ServerPlayer player, final ServerLevel world, final long now) {
-		final DungeonData data = world.getDataStorage().computeIfAbsent(DUNGEON_TYPE);
-		final Long last = data.lastEntry.get(player.getUUID());
-		if (last != null && now - last < DungeonConfig.COOLDOWN_MS) {
-			final long remainSec = (DungeonConfig.COOLDOWN_MS - (now - last)) / 1000L;
-			deny(player, "副本冷却中，还需 " + remainSec / 60 + " 分 " + remainSec % 60 + " 秒才能再次进入");
+	/** 服务端入口：校验并扣除硬币后，按所选难度把玩家送入副本。 */
+	static void requestEnter(final ServerPlayer player, final int diff) {
+		if (diff < 0 || diff >= DungeonConfig.DIFFICULTIES.length) {
+			deny(player, "未知的难度档位");
 			return;
 		}
+		final MinecraftServer server = player.level().getServer();
+		if (server == null) {
+			return;
+		}
+		final ServerLevel world = server.getLevel(Level.OVERWORLD);
+		if (world == null) {
+			return;
+		}
+		final DungeonData data = world.getDataStorage().computeIfAbsent(DUNGEON_TYPE);
+		final DungeonConfig.Difficulty d = DungeonConfig.DIFFICULTIES[diff];
+		// 校验硬币
+		final int have = countCoins(player);
+		if (have < d.cost) {
+			deny(player, "硬币不足：需要 " + d.cost + " 个，你只有 " + have + " 个");
+			return;
+		}
+		// 扣除硬币（进入即消耗，selectedDiff 一并清掉，避免踩传送门免费再进）
+		removeCoins(player, d.cost);
+		selectedDiff.remove(player.getUUID());
+		enterDungeon(player, world, System.currentTimeMillis(), diff);
+		player.sendSystemMessage(Component.literal("已扣除 " + d.cost + " 硬币，进入「" + d.nameZh + "」难度。"));
+	}
+
+	/** 统计玩家背包（主背包 + 副手）里的硬币数量。 */
+	private static int countCoins(final ServerPlayer player) {
+		int n = 0;
+		for (final ItemStack s : player.getInventory().getNonEquipmentItems()) {
+			if (s.is(Cjm_skyisland.COIN)) {
+				n += s.getCount();
+			}
+		}
+		return n;
+	}
+
+	/** 从玩家背包（主背包 + 副手）移除指定数量的硬币。 */
+	private static void removeCoins(final ServerPlayer player, final int amount) {
+		int remaining = amount;
+		for (final ItemStack s : player.getInventory().getNonEquipmentItems()) {
+			if (remaining <= 0) {
+				break;
+			}
+			if (s.is(Cjm_skyisland.COIN)) {
+				final int take = Math.min(s.getCount(), remaining);
+				s.shrink(take);
+				remaining -= take;
+			}
+		}
+		player.inventoryMenu.broadcastChanges();
+	}
+
+	/** 真正执行进入：确保平台、按难度重置、传送、记录停留时间。 */
+	private static void enterDungeon(final ServerPlayer player, final ServerLevel world, final long now, final int diff) {
+		final DungeonData data = world.getDataStorage().computeIfAbsent(DUNGEON_TYPE);
 		ensureBuilt(world, data);
-		resetDungeon(world, data);
+		resetDungeon(world, data, diff);
 		data.lastEntry.put(player.getUUID(), now);
 		data.setDirty();
 		inDungeonSince.put(player.getUUID(), now);
 
+		final DungeonConfig.Difficulty d = DungeonConfig.DIFFICULTIES[diff];
 		final BlockPos floor = randomSpawnPos(world, data);
 		// randomSpawnPos 返回的是「地板上方那一格」，玩家脚部正好落在这一格，直接踩在石地板上
 		player.teleportTo(world, floor.getX() + 0.5, floor.getY(), floor.getZ() + 0.5,
 				Set.of(), player.getYRot(), player.getXRot(), false);
-		player.sendSystemMessage(Component.literal("你已进入副本空岛：100 只怪物、4 个奖励箱。"));
+		player.sendSystemMessage(Component.literal("你已进入副本空岛（" + d.nameZh + "）：" + d.mobCount + " 只怪物、4 个奖励箱。"));
 		player.sendSystemMessage(Component.literal("最少停留 5 分钟才能从中央传送阵离开，20 分钟后会被强制淘汰。"));
-		LOGGER.info("[skyisland] {} 进入副本空岛（落点 {}）", player.getName().getString(), floor.toShortString());
+		LOGGER.info("[skyisland] {} 进入副本空岛（{} 难度，落点 {}）", player.getName().getString(), d.nameZh, floor.toShortString());
 	}
 
 	private static void tryReturn(final ServerPlayer player, final ServerLevel world, final long now) {
@@ -539,13 +592,14 @@ public final class Dungeon {
 	 * 玩家是不是站在传送门里。
 	 *
 	 * <p>传送门方块是 {@code noCollision()} 的（像末地传送门），玩家踩的是它下面那一格地面，
-	 * 身体则处在传送门方块所在格 —— 所以判定要看「玩家所在格」，不能再只看脚下方块。
+	 * 身体则处在传送门方块所在格 —— 所以要检查脚下、脚下上方（身体所在）两格。
 	 * 保留脚下那一格的判断是为了兼容仍在旧存档里的老传送阵。
 	 */
 	private static boolean isOnPortal(final ServerLevel world, final ServerPlayer player) {
 		final BlockPos feet = player.blockPosition();
 		return world.getBlockState(feet).is(Cjm_skyisland.PORTAL_BLOCK)
-				|| world.getBlockState(feet.below()).is(Cjm_skyisland.PORTAL_BLOCK);
+				|| world.getBlockState(feet.below()).is(Cjm_skyisland.PORTAL_BLOCK)
+				|| world.getBlockState(feet.above()).is(Cjm_skyisland.PORTAL_BLOCK);
 	}
 
 	/** 该坐标是否属于「玩家自己岛上那座传送阵」的 4x4 范围。 */
@@ -599,7 +653,14 @@ public final class Dungeon {
 		if (isInDungeon(player.getBlockX(), player.getBlockZ())) {
 			tryReturn(player, world, now); // 副本中央传送阵 -> 回家
 		} else {
-			tryEnter(player, world, now); // 自己岛上的传送阵 -> 进副本
+			// 自己岛上的传送阵：必须先通过祭坛选过难度（已付费），否则提示去选
+			final Integer diff = selectedDiff.get(player.getUUID());
+			if (diff == null) {
+				deny(player, "请先右键头顶的硬币祭坛选择难度");
+			} else {
+				selectedDiff.remove(player.getUUID()); // 免费复用已付费的难度，进入后失效
+				enterDungeon(player, world, now, diff);
+			}
 		}
 	}
 
@@ -618,8 +679,9 @@ public final class Dungeon {
 				deny(serverPlayer, "副本空岛内不能破坏方块");
 				return false;
 			}
-			if (state.is(Cjm_skyisland.PORTAL_BLOCK) || isHomePortalFootprint(serverPlayer, pos)) {
-				deny(serverPlayer, "传送阵无法被破坏");
+			if (state.is(Cjm_skyisland.PORTAL_BLOCK) || state.is(Cjm_skyisland.DUNGEON_CORE_BLOCK)
+					|| isHomePortalFootprint(serverPlayer, pos)) {
+				deny(serverPlayer, "传送阵与祭坛无法被破坏");
 				return false;
 			}
 			return true;

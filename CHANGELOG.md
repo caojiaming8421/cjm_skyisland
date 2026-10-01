@@ -10,6 +10,35 @@
 
 ---
 
+## [1.5.5] - 2026-10-01
+
+副本进入改为「硬币解锁 + 三档难度」，并移除 30 分钟进入冷却。
+
+### 新增
+- **副本难度入口方块「硬币祭坛」** `cjm_skyisland:dungeon_core`（`DungeonCoreBlock`）
+  - 放在每个玩家空岛传送阵中心**正上方 2 格**，挖不动（强度 -1）、不可破坏
+  - 右键打开「副本难度选择」GUI（`client/DifficultyScreen`）：简单 / 普通 / 困难 三档按钮，各显示「花费硬币 / 怪物数 / 装备材质」
+  - 客户端通过 `UseBlockCallback` 拦截右键直接开界面（common 端不依赖 client 类）；选区用 `SelectDifficultyC2S` 网络包发到服务端
+- **难度选择网络包** `network/SelectDifficultyC2S`（`CustomPacketPayload` + `StreamCodec.composite`）
+  - 服务端 `PayloadTypeRegistry.serverboundPlay().register` + `ServerPlayNetworking.registerGlobalReceiver` 接收
+  - 收到后调用 `Dungeon.requestEnter(player, diff)`：检查硬币 → 扣费 → 进入
+- **难度三档配置** 集中在 `world/DungeonConfig.java`
+  - 战利品池拆成 `STONE_LOOT`（石质 5 件）/ `IRON_LOOT`（铁质 9 件）/ `DIAMOND_LOOT`（钻石 9 件）
+  - `Difficulty[] DIFFICULTIES`：简单 `cost=20` / `mobCount=20` / 石质；普通 `cost=50` / `mobCount=50` / 铁质；困难 `cost=100` / `mobCount=100` / 钻石
+- 方块模型 `blockstates/dungeon_core.json` + `models/block/dungeon_core.json`（石英基座 + 金块硬币，多层渲染）+ 物品模型 + 中英文 lang
+
+### 变更
+- **进入副本必须先消耗空岛硬币解锁**：原 `tryEnter` 改为 `enterDungeon`，去掉 30 分钟冷却检查；改为在 `requestEnter` 里 `countCoins` 统计背包硬币，`removeCoins` 扣费（不足则拦截并提示）
+- **移除 30 分钟进入冷却**：删除 `DungeonConfig.COOLDOWN_MS`；`DungeonData` 不再记录 `last_entry`
+- 进入时从 `selectedDiff` 取难度；**未选难度踩传送门**会提示「请先右键头顶的硬币祭坛选择难度」
+- 选难度即扣币，踩传送门免费复用已付费难度（`selectedDiff` 进入后清除），避免重复扣费
+- 副本内的怪物数量 / 奖励箱装备材质随所选难度变化（`resetDungeon` 接收 `diff` 参数，驱动 `spawnMobs` / `refillChests`）
+- 传送门判定补 `feet.above()` 检查，确保 `noCollision()` 方块仍能触发
+
+### 说明
+- **停留限制保留**：最短停留 5 分钟（`MIN_STAY_MS`）+ 最长停留 20 分钟强制淘汰（`MAX_STAY_MS`），仅去掉 30 分钟冷却
+- mod 版本号 1.5.4 → 1.5.5
+
 ## [1.5.4] - 2026-10-01
 
 修正传送门视觉：星海面应齐着框口，而不是沉在池底。

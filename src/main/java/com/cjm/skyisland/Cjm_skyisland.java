@@ -10,6 +10,7 @@ import net.minecraft.resources.Identifier;
 import net.minecraft.resources.ResourceKey;
 import net.minecraft.world.entity.EntityType;
 import net.minecraft.world.entity.MobCategory;
+import net.minecraft.world.item.BlockItem;
 import net.minecraft.world.item.CreativeModeTab;
 import net.minecraft.world.item.Item;
 import net.minecraft.world.item.ItemStack;
@@ -18,7 +19,11 @@ import net.minecraft.world.level.block.Block;
 import net.minecraft.world.level.block.SoundType;
 import net.minecraft.world.level.block.state.BlockBehaviour;
 
+import net.fabricmc.fabric.api.networking.v1.PayloadTypeRegistry;
+import net.fabricmc.fabric.api.networking.v1.ServerPlayNetworking;
+
 import com.cjm.skyisland.entity.CjmVillager;
+import com.cjm.skyisland.network.SelectDifficultyC2S;
 import com.cjm.skyisland.world.SkyblockWorldPreset;
 
 public class Cjm_skyisland implements ModInitializer {
@@ -79,6 +84,30 @@ public class Cjm_skyisland implements ModInitializer {
 			.noOcclusion())
 	);
 
+	/** 难度入口方块 id：26.x 的 BlockBehaviour.Properties 必须显式 setId。 */
+	private static final ResourceKey<Block> DUNGEON_CORE_ID = ResourceKey.create(Registries.BLOCK, id("dungeon_core"));
+
+	/** 副本难度入口（硬币祭坛，id: cjm_skyisland:dungeon_core）：放在空岛传送阵上方，右键选难度。 */
+	public static final Block DUNGEON_CORE_BLOCK = Registry.register(
+		BuiltInRegistries.BLOCK,
+		DUNGEON_CORE_ID,
+		new DungeonCoreBlock(BlockBehaviour.Properties.of()
+			.setId(DUNGEON_CORE_ID)
+			.strength(-1.0F, 3600000.0F)
+			.sound(SoundType.METAL)
+			.noOcclusion())
+	);
+
+	/** 难度入口物品 id。 */
+	private static final ResourceKey<Item> DUNGEON_CORE_ITEM_ID = ResourceKey.create(Registries.ITEM, id("dungeon_core"));
+
+	/** 难度入口的物品形式（创造模式取用）。 */
+	public static final Item DUNGEON_CORE_ITEM = Registry.register(
+		BuiltInRegistries.ITEM,
+		DUNGEON_CORE_ITEM_ID,
+		new BlockItem(DUNGEON_CORE_BLOCK, new Item.Properties().setId(DUNGEON_CORE_ITEM_ID))
+	);
+
 	/**
 	 * 自定义创造模式标签（id: cjm_skyisland:villager_tab）。
 	 * 本版本的 fabric-api 里没有 item-group 模块，无法往原版标签追加条目，
@@ -93,6 +122,7 @@ public class Cjm_skyisland implements ModInitializer {
 			.displayItems((parameters, output) -> {
 				output.accept(CJM_VILLAGER_EGG);
 				output.accept(COIN);
+				output.accept(DUNGEON_CORE_ITEM);
 			})
 			.build()
 	);
@@ -107,6 +137,10 @@ public class Cjm_skyisland implements ModInitializer {
 		IslandSpawner.register();
 		// 副本空岛：传送阵进出、刷怪、奖励箱、规则限制
 		Dungeon.register();
+		// 难度选择网络包（客户端点选难度 -> 服务端扣硬币并送入副本）
+		PayloadTypeRegistry.serverboundPlay().register(SelectDifficultyC2S.TYPE, SelectDifficultyC2S.STREAM_CODEC);
+		ServerPlayNetworking.registerGlobalReceiver(SelectDifficultyC2S.TYPE,
+			(payload, context) -> context.server().execute(() -> Dungeon.requestEnter(context.player(), payload.difficulty())));
 	}
 
 	// Makes a new Identifier with the mod's namespace.
