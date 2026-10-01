@@ -10,9 +10,22 @@
 
 ---
 
+## [1.5.11] - 2026-10-01
+
+修复 `副本入口石碑` 物品在物品栏 / 交易界面显示为紫黑缺失纹理的问题（根因是缺少 `items/dungeon_core.json` 这个新版物品模型注册文件）。
+
+### 修复
+- 新增 `items/dungeon_core.json`，类型为 `minecraft:model`，指向 `cjm_skyisland:item/dungeon_core`
+
+### 说明
+- 该版本同时保留 1.5.10 的 `textures/item/dungeon_core.png` 与 `models/item/dungeon_core.json`
+- mod 版本号 1.5.10 → 1.5.11
+
+---
+
 ## [1.5.10] - 2026-10-01
 
-修复 `副本入口石碑` 物品在物品栏 / 交易界面显示为紫黑缺失纹理的问题（根因是物品图标必须放在 `textures/item/` 图集里）。
+修复 `副本入口石碑` 物品在物品栏 / 交易界面显示为紫黑缺失纹理的问题（尝试失败：只加了 `textures/item/` 贴图与 `models/item/` 模型，但缺少新版 `items/` 注册文件）。
 
 ### 修复
 - 新增 `textures/item/dungeon_core.png` 专用物品图标
