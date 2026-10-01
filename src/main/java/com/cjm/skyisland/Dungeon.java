@@ -364,17 +364,30 @@ public final class Dungeon {
 
 	// ==================== 重置：怪物与奖励箱 ====================
 
-	/** 每次开启：清掉旧怪与地面掉落物 -> 按难度刷怪 -> 按难度重填奖励箱。 */
+	/** 每次开启：加载平台区块 -> 清掉旧怪与地面掉落物 -> 按难度刷怪 -> 按难度重填奖励箱。 */
 	private static void resetDungeon(final ServerLevel world, final DungeonData data, final int diff) {
 		final DungeonConfig.Difficulty d = DungeonConfig.DIFFICULTIES[diff];
+		// 必须先加载平台所在的所有区块，否则 getEntitiesOfClass 只能扫到已加载区块，会漏掉掉落物/怪物
+		for (int sx = SectionPos.blockToSectionCoord(DungeonConfig.MIN_X); sx <= SectionPos.blockToSectionCoord(DungeonConfig.MAX_X); sx++) {
+			for (int sz = SectionPos.blockToSectionCoord(DungeonConfig.MIN_Z); sz <= SectionPos.blockToSectionCoord(DungeonConfig.MAX_Z); sz++) {
+				world.getChunkSource().getChunk(sx, sz, ChunkStatus.FULL, true);
+			}
+		}
 		final AABB box = regionBox();
 		// 清掉上一轮残留的怪物
+		int mobRemoved = 0;
 		for (final Monster old : world.getEntitiesOfClass(Monster.class, box, mob -> mob.isAlive())) {
 			old.discard();
+			mobRemoved++;
 		}
 		// 清掉上一轮残留的地面掉落物（玩家死亡掉落 / 怪物掉落 / 箱子被掏后的散落物）
+		int dropRemoved = 0;
 		for (final ItemEntity drop : world.getEntitiesOfClass(ItemEntity.class, box, e -> e.isAlive())) {
 			drop.discard();
+			dropRemoved++;
+		}
+		if (mobRemoved > 0 || dropRemoved > 0) {
+			LOGGER.info("[skyisland] 副本重置：清掉 {} 只旧怪、{} 个地面掉落物", mobRemoved, dropRemoved);
 		}
 		currentMobTarget = d.mobCount;
 		spawnMobs(world, d.mobCount);
