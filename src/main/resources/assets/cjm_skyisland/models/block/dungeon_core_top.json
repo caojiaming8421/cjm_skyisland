@@ -2,6 +2,7 @@
   "parent": "minecraft:block/block",
   "textures": {
     "face": "cjm_skyisland:block/dungeon_core_top",
+    "cap": "cjm_skyisland:block/dungeon_core_cap",
     "side": "cjm_skyisland:block/dungeon_core_side"
   },
   "elements": [
@@ -19,7 +20,8 @@
       "from": [2, 12, 2],
       "to": [14, 16, 14],
       "faces": {
-        "up": { "texture": "#side" },
+        "up": { "texture": "#cap" },
+        "down": { "texture": "#cap" },
         "north": { "texture": "#face", "uv": [0, 12, 16, 16] },
         "south": { "texture": "#face", "uv": [0, 12, 16, 16] },
         "west": { "texture": "#side" },

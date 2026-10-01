@@ -193,7 +193,7 @@ public final class Dungeon {
 
 	// ==================== 建造 ====================
 
-	/** 玩家进服建岛后调用：在他的空岛上补一座 1×3 副本入口石碑（已存在则跳过）。 */
+	/** 玩家进服建岛后调用：在他的空岛上补一座 1×3 副本入口石碑（已存在则跳过，旧档缺中/上节时补齐）。 */
 	public static void ensureEntrance(final ServerPlayer player, final ServerLevel world) {
 		final BlockPos center = IslandSpawner.islandCenter(player);
 		final BlockPos bottom = new BlockPos(
@@ -205,7 +205,10 @@ public final class Dungeon {
 		final BlockPos top = middle.above();
 		loadChunkAt(world, bottom);
 		loadChunkAt(world, top);
-		if (world.getBlockState(bottom).is(Cjm_skyisland.DUNGEON_CORE_BLOCK)) {
+		final boolean hasBottom = world.getBlockState(bottom).is(Cjm_skyisland.DUNGEON_CORE_BLOCK);
+		final boolean hasMiddle = world.getBlockState(middle).is(Cjm_skyisland.DUNGEON_CORE_BLOCK);
+		final boolean hasTop = world.getBlockState(top).is(Cjm_skyisland.DUNGEON_CORE_BLOCK);
+		if (hasBottom && hasMiddle && hasTop) {
 			return;
 		}
 		world.setBlockAndUpdate(bottom, Cjm_skyisland.DUNGEON_CORE_BLOCK.defaultBlockState()
