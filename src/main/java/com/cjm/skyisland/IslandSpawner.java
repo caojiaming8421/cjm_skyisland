@@ -5,6 +5,7 @@ import com.cjm.skyisland.world.SkyblockConfig;
 import com.mojang.logging.LogUtils;
 import net.fabricmc.fabric.api.entity.event.v1.ServerLivingEntityEvents;
 import net.fabricmc.fabric.api.entity.event.v1.ServerPlayerEvents;
+import net.fabricmc.fabric.api.event.lifecycle.v1.ServerTickEvents;
 import net.fabricmc.fabric.api.event.player.PlayerBlockBreakEvents;
 import net.minecraft.core.BlockPos;
 import net.minecraft.resources.ResourceKey;
@@ -31,6 +32,7 @@ import net.minecraft.world.phys.AABB;
 import org.slf4j.Logger;
 
 import java.util.HashSet;
+import java.util.List;
 import java.util.Set;
 import java.util.UUID;
 
@@ -92,6 +94,13 @@ public final class IslandSpawner {
 			DataFixTypes.PLAYER
 	);
 
+	/** 判定「玩家在自己岛上」的 XZ 半径（岛本身只有 10x10，放宽到 32 覆盖周边活动范围）。 */
+	private static final int ISLAND_CHECK_RADIUS = 32;
+	/** 每多少 tick 检查一次岛上村民（2 秒）。检查本身很轻，但只有玩家在岛上时才动手。 */
+	private static final int VILLAGER_CHECK_INTERVAL = 40;
+	/** tick 计数，用于周期性村民检查。 */
+	private static int tickCounter = 0;
+
 	private IslandSpawner() {
 	}
 
@@ -152,16 +161,38 @@ public final class IslandSpawner {
 		return true;
 	}
 
-	/** 在空岛上生成一只「空岛村民」（每个岛固定一只，已存在则跳过）。 */
+	/**
+	 * 保证玩家空岛上有且只有一只「空岛村民」。
+	 *
+	 * <p><b>只在玩家真的身处自己岛上时才检查</b>。原因和 1.5.14 修掉落物时踩的坑完全一样：
+	 * 岛所在区块没有被真正加载时（玩家在副本里、或在别的维度），
+	 * {@code getEntitiesOfClass} 扫不到已有的村民 —— 实体还没挂进世界 —— 于是每次进服都会
+	 * 误判成「岛上没村民」而补生成一只，表现就是「每进一次游戏多一只村民」。
+	 * 玩家不在岛上时这里直接跳过，改由 {@link #onEndTick} 在他回岛后周期性补检。
+	 *
+	 * <p>顺带做收敛：如果岛上已经堆了好几只（旧版本重复生成的），只保留一只，其余清掉。
+	 * 村民被杀掉或丢失时，玩家回岛后 2 秒内会自动补齐。
+	 */
 	private static void ensureIslandVillager(final ServerPlayer player, final ServerLevel world) {
+		if (!isOnOwnIsland(player)) {
+			return; // 区块没真正加载，扫不到实体；等玩家回岛后由 onEndTick 补检
+		}
 		final BlockPos center = islandCenter(player);
 		final int r = SkyblockConfig.ISLAND_HALF + 2;
 		final AABB box = new AABB(
 				center.getX() - r, center.getY() - 4, center.getZ() - r,
 				center.getX() + r + 1, center.getY() + 6, center.getZ() + r + 1
 		);
-		final boolean exists = !world.getEntitiesOfClass(CjmVillager.class, box, e -> e.isAlive()).isEmpty();
-		if (exists) {
+		final List<CjmVillager> villagers = world.getEntitiesOfClass(CjmVillager.class, box, e -> e.isAlive());
+		// 多余的（多半是旧版本重复生成的）只保留一只
+		for (int i = 1; i < villagers.size(); i++) {
+			villagers.get(i).discard();
+		}
+		if (!villagers.isEmpty()) {
+			if (villagers.size() > 1) {
+				LOGGER.info("[skyisland] {} 的空岛上有 {} 只村民，已保留 1 只、清掉 {} 只",
+						player.getName().getString(), villagers.size(), villagers.size() - 1);
+			}
 			return;
 		}
 		// 站在草方块上，稍微偏离岛心，避免和玩家落点重叠
@@ -172,6 +203,40 @@ public final class IslandSpawner {
 		}
 		villager.setYRot(world.getRandom().nextFloat() * 360.0F);
 		villager.setPersistenceRequired(); // 不因距离过远而消失
+		LOGGER.info("[skyisland] 已在 {} 的空岛上生成空岛村民 {}", player.getName().getString(), spot.toShortString());
+	}
+
+	/**
+	 * 玩家是否正身处自己的空岛（维度 + XZ + 高度都判定）。
+	 *
+	 * <p>这是「能不能扫到岛上实体」的前提：只有玩家人在附近，岛区块才会真正加载，
+	 * 区块里保存的实体才会挂进世界。
+	 */
+	private static boolean isOnOwnIsland(final ServerPlayer player) {
+		if (!player.level().dimension().equals(Level.OVERWORLD)) {
+			return false;
+		}
+		final BlockPos center = islandCenter(player);
+		final BlockPos pos = player.blockPosition();
+		return Math.abs(pos.getX() - center.getX()) <= ISLAND_CHECK_RADIUS
+				&& Math.abs(pos.getZ() - center.getZ()) <= ISLAND_CHECK_RADIUS
+				&& pos.getY() >= center.getY() - 16
+				&& pos.getY() <= center.getY() + 48;
+	}
+
+	/** 每 tick 钩子：定期给「正在自己岛上」的玩家补检村民。 */
+	private static void onEndTick(final MinecraftServer server) {
+		tickCounter++;
+		if (tickCounter % VILLAGER_CHECK_INTERVAL != 0) {
+			return;
+		}
+		final ServerLevel world = overworld(server);
+		if (world == null) {
+			return;
+		}
+		for (final ServerPlayer player : server.getPlayerList().getPlayers()) {
+			ensureIslandVillager(player, world);
+		}
 	}
 
 	/** 发放初始物资：1 个橡树树苗 + 4 个骨粉（是否只发一次由调用方用 StarterKitData 标记控制）。 */
@@ -259,7 +324,7 @@ public final class IslandSpawner {
 			return;
 		}
 		buildIsland(player, world);
-		// 岛已存在但村民被杀掉/丢失时也会补齐，保证「每个空岛默认一只」
+		// 岛上村民：只有玩家此刻就在岛上时才检查/生成，否则交给周期性补检（避免区块未加载误判而重复生成）
 		ensureIslandVillager(player, world);
 		// 空岛上的副本入口石碑（老存档进来时也会补建 / 补齐缺失的中上节）
 		Dungeon.ensureEntrance(player, world);
@@ -275,10 +340,13 @@ public final class IslandSpawner {
 		}
 	}
 
-	/** 注册进服、拆床、死亡、重生四类事件。 */
+	/** 注册进服、拆床、死亡、重生四类事件，以及周期性村民补检。 */
 	public static void register() {
 		// 进服：首次生成专属空岛 + 设重生点
 		ServerPlayerEvents.JOIN.register(IslandSpawner::ensureIsland);
+
+		// 岛上村民补检：玩家回岛后（岛区块真正加载）才检查，缺了就补、多了就收到一只
+		ServerTickEvents.END_SERVER_TICK.register(IslandSpawner::onEndTick);
 
 		// 保险①：床/重生锚被拆掉的那一刻就修好重生点
 		PlayerBlockBreakEvents.AFTER.register((world, breaker, pos, state, blockEntity) -> {
