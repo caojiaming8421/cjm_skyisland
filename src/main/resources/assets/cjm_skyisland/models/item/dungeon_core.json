@@ -1,6 +1,6 @@
 {
   "parent": "minecraft:item/generated",
   "textures": {
-    "layer0": "cjm_skyisland:block/dungeon_core_mid"
+    "layer0": "cjm_skyisland:item/dungeon_core"
   }
 }
