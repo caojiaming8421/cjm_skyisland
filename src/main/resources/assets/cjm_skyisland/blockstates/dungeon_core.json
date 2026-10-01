@@ -1,5 +1,7 @@
 {
   "variants": {
-    "": { "model": "cjm_skyisland:block/dungeon_core" }
+    "section=bottom": { "model": "cjm_skyisland:block/dungeon_core_bottom" },
+    "section=middle": { "model": "cjm_skyisland:block/dungeon_core_mid" },
+    "section=top": { "model": "cjm_skyisland:block/dungeon_core_top" }
   }
 }

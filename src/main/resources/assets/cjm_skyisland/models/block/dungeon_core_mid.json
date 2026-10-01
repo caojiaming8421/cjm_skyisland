@@ -1,0 +1,19 @@
+{
+  "parent": "minecraft:block/block",
+  "textures": {
+    "face": "cjm_skyisland:block/dungeon_core_mid",
+    "side": "cjm_skyisland:block/dungeon_core_side"
+  },
+  "elements": [
+    {
+      "from": [3, 0, 3],
+      "to": [13, 16, 13],
+      "faces": {
+        "north": { "texture": "#face" },
+        "south": { "texture": "#face" },
+        "west": { "texture": "#side" },
+        "east": { "texture": "#side" }
+      }
+    }
+  ]
+}

@@ -10,16 +10,40 @@
 
 ---
 
+## [1.5.7] - 2026-10-01
+
+修复 1.5.6 中副本入口石碑显示为紫黑缺失纹理的问题：MC 方块模型元素坐标必须限制在 0–16 内，之前的单文件 1×3 模型高度 48 导致加载失败。现把石碑拆成 `section=bottom/middle/top` 三节堆叠，每节单独模型与贴图。
+
+### 修复
+- 修复 `dungeon_core` 石碑紫黑缺失纹理：模型元素坐标超出 0–16 导致游戏回退成缺失纹理
+- 新增 `DungeonCoreBlock.Section` 属性（`bottom / middle / top`），石碑改为三格高多方块结构
+
+### 变更
+- `Dungeon.ensureEntrance` 现在会依次放置石碑的下、中、上三节
+- 玩家手持 `dungeon_core` 放置时会自动向上补 middle 与 top（需要上方两格为空）
+- 模型与贴图拆分：
+  - `models/block/dungeon_core_bottom.json` + `textures/block/dungeon_core_bottom.png`（底座）
+  - `models/block/dungeon_core_mid.json` + `textures/block/dungeon_core_mid.png`（碑身带金币浮雕）
+  - `models/block/dungeon_core_top.json` + `textures/block/dungeon_core_top.png`（碑顶）
+  - `textures/block/dungeon_core_side.png`（三节共用石质侧面）
+- 移除旧的单文件模型 `dungeon_core.json` 与单张贴图 `dungeon_core.png`
+- 物品手持模型使用中间节 `dungeon_core_mid`
+
+### 说明
+- 右键石碑任意一节都能打开难度选择 GUI；三节均不可破坏
+- mod 版本号 1.5.6 → 1.5.7
+
+---
+
 ## [1.5.6] - 2026-10-01
 
-去掉玩家空岛上的 4×4 副本传送阵，保留并改为「副本入口石碑」（`dungeon_core`）作为唯一入口：1×3 高石碑造型，带自定义石碑贴图。
+去掉玩家空岛上的 4×4 副本传送阵，保留并改为「副本入口石碑」（`dungeon_core`）作为唯一入口：1×3 高石碑造型。
 
 ### 变更
 - **移除玩家空岛上的 4×4 副本传送阵**：`Dungeon.ensureEntrance`（原 `ensureHomePortal`）不再铺设萤石/陶釉/传送门，只在空岛固定位置生成 `dungeon_core` 石碑
   - 旧存档里已建好的空岛传送门会留在原地，但不再触发进入；它们仍是不可破坏方块
 - **副本入口石碑成为唯一入口**：右键石碑打开难度 GUI → 选难度 → 扣硬币 → 直接进副本，流程与 1.5.5 的 `requestEnter` 一致
   - 删除 `Dungeon.selectedDiff` 与 `isHomePortalFootprint`，`handlePlayer` 只负责「副本中央传送阵 → 回家」的回程逻辑
-- **石碑模型改为 1×3 石碑造型**（`models/block/dungeon_core.json`）：基座 + 碑身 + 碑顶共 48 格高，正面贴 `dungeon_core.png`（金币浮雕石碑），其余面贴 `dungeon_core_side.png`（石质纹理）
 - **石碑音效改为石头**：`SoundType.METAL` → `SoundType.STONE`
 - 中英文 lang：`block/item.cjm_skyisland.dungeon_core` 改为「副本入口石碑」/ "Dungeon Entrance Stele"
 

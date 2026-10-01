@@ -193,20 +193,28 @@ public final class Dungeon {
 
 	// ==================== 建造 ====================
 
-	/** 玩家进服建岛后调用：在他的空岛上补一座副本入口石碑（已存在则跳过）。 */
+	/** 玩家进服建岛后调用：在他的空岛上补一座 1×3 副本入口石碑（已存在则跳过）。 */
 	public static void ensureEntrance(final ServerPlayer player, final ServerLevel world) {
 		final BlockPos center = IslandSpawner.islandCenter(player);
-		final BlockPos pos = new BlockPos(
+		final BlockPos bottom = new BlockPos(
 				center.getX() + ENTRANCE_OFF_X,
 				SkyblockConfig.ISLAND_Y + 1,
 				center.getZ() + ENTRANCE_OFF_Z
 		);
-		loadChunkAt(world, pos);
-		if (world.getBlockState(pos).is(Cjm_skyisland.DUNGEON_CORE_BLOCK)) {
+		final BlockPos middle = bottom.above();
+		final BlockPos top = middle.above();
+		loadChunkAt(world, bottom);
+		loadChunkAt(world, top);
+		if (world.getBlockState(bottom).is(Cjm_skyisland.DUNGEON_CORE_BLOCK)) {
 			return;
 		}
-		world.setBlockAndUpdate(pos, Cjm_skyisland.DUNGEON_CORE_BLOCK.defaultBlockState());
-		LOGGER.info("[skyisland] 已在 {} 的空岛上生成副本入口石碑 {}", player.getName().getString(), pos.toShortString());
+		world.setBlockAndUpdate(bottom, Cjm_skyisland.DUNGEON_CORE_BLOCK.defaultBlockState()
+				.setValue(DungeonCoreBlock.SECTION, DungeonCoreBlock.Section.BOTTOM));
+		world.setBlockAndUpdate(middle, Cjm_skyisland.DUNGEON_CORE_BLOCK.defaultBlockState()
+				.setValue(DungeonCoreBlock.SECTION, DungeonCoreBlock.Section.MIDDLE));
+		world.setBlockAndUpdate(top, Cjm_skyisland.DUNGEON_CORE_BLOCK.defaultBlockState()
+				.setValue(DungeonCoreBlock.SECTION, DungeonCoreBlock.Section.TOP));
+		LOGGER.info("[skyisland] 已在 {} 的空岛上生成副本入口石碑 {}", player.getName().getString(), bottom.toShortString());
 	}
 
 	/** 确保某个坐标所在区块已加载（未加载时 getBlockState 会误报空气）。 */
