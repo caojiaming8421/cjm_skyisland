@@ -6,5 +6,7 @@
   "entity.cjm_skyisland.villager": "空岛村民",
   "block.cjm_skyisland.portal": "副本传送门",
   "block.cjm_skyisland.dungeon_core": "副本入口石碑",
-  "item.cjm_skyisland.dungeon_core": "副本入口石碑"
+  "item.cjm_skyisland.dungeon_core": "副本入口石碑",
+  "block.cjm_skyisland.town_portal": "主城传送碑",
+  "item.cjm_skyisland.town_portal": "主城传送碑"
 }

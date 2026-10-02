@@ -6,5 +6,7 @@
   "entity.cjm_skyisland.villager": "Skyblock Villager",
   "block.cjm_skyisland.portal": "Dungeon Portal",
   "block.cjm_skyisland.dungeon_core": "Dungeon Entrance Stele",
-  "item.cjm_skyisland.dungeon_core": "Dungeon Entrance Stele"
+  "item.cjm_skyisland.dungeon_core": "Dungeon Entrance Stele",
+  "block.cjm_skyisland.town_portal": "Town Portal Stele",
+  "item.cjm_skyisland.town_portal": "Town Portal Stele"
 }

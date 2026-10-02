@@ -328,6 +328,8 @@ public final class IslandSpawner {
 		ensureIslandVillager(player, world);
 		// 空岛上的副本入口石碑（老存档进来时也会补建 / 补齐缺失的中上节）
 		Dungeon.ensureEntrance(player, world);
+		// 空岛上的主城传送碑（右键往返主岛）
+		MainIsland.ensurePortal(player, world);
 		// 初始物资：每个玩家仅发放一次（用存档数据按 UUID 标记，跨进服 / 重生 / 重启保留）
 		final StarterKitData kitData = world.getDataStorage().computeIfAbsent(STARTER_KIT_TYPE);
 		if (!kitData.has(player.getUUID())) {

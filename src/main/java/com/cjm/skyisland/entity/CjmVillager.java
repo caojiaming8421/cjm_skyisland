@@ -1,8 +1,13 @@
 package com.cjm.skyisland.entity;
 
 import com.cjm.skyisland.Cjm_skyisland;
+import com.cjm.skyisland.shop.ShopTrades;
+import com.cjm.skyisland.shop.ShopType;
 
 import net.minecraft.network.chat.Component;
+import net.minecraft.network.syncher.EntityDataAccessor;
+import net.minecraft.network.syncher.EntityDataSerializers;
+import net.minecraft.network.syncher.SynchedEntityData;
 import net.minecraft.sounds.SoundEvent;
 import net.minecraft.sounds.SoundEvents;
 import net.minecraft.world.InteractionHand;
@@ -23,6 +28,8 @@ import net.minecraft.world.item.trading.MerchantOffer;
 import net.minecraft.world.item.trading.MerchantOffers;
 import net.minecraft.world.level.ItemLike;
 import net.minecraft.world.level.Level;
+import net.minecraft.world.level.storage.ValueInput;
+import net.minecraft.world.level.storage.ValueOutput;
 
 /**
  * 自定义「空岛村民」生物。
@@ -42,6 +49,11 @@ public class CjmVillager extends PathfinderMob implements Merchant {
 	private static final double TRADE_RANGE_SQR = 64.0D;
 	/** 村民等级，固定 1（本模组没有升级体系）。 */
 	private static final int TRADE_LEVEL = 1;
+	/** 同步到客户端的店铺类型 id（见 {@link ShopType}），决定这个村民经营什么。 */
+	private static final EntityDataAccessor<String> DATA_SHOP_TYPE =
+			SynchedEntityData.defineId(CjmVillager.class, EntityDataSerializers.STRING);
+	/** 存档里的字段名。 */
+	private static final String TAG_SHOP_TYPE = "ShopType";
 
 	private Player tradingPlayer;
 	private MerchantOffers offers;
@@ -77,80 +89,57 @@ public class CjmVillager extends PathfinderMob implements Merchant {
 		}
 	}
 
+	// ==================== 店铺类型 ====================
+
+	@Override
+	protected void defineSynchedData(final SynchedEntityData.Builder builder) {
+		super.defineSynchedData(builder);
+		builder.define(DATA_SHOP_TYPE, ShopType.GENERAL.id);
+	}
+
+	@Override
+	protected void addAdditionalSaveData(final ValueOutput output) {
+		super.addAdditionalSaveData(output);
+		output.putString(TAG_SHOP_TYPE, this.entityData.get(DATA_SHOP_TYPE));
+	}
+
+	@Override
+	protected void readAdditionalSaveData(final ValueInput input) {
+		super.readAdditionalSaveData(input);
+		final String id = input.getStringOr(TAG_SHOP_TYPE, ShopType.GENERAL.id);
+		this.entityData.set(DATA_SHOP_TYPE, id);
+		this.offers = null; // 读档后按类型重建交易表
+	}
+
+	/** 这个村民经营的店铺类型。 */
+	public ShopType getShopType() {
+		return ShopType.fromId(this.entityData.get(DATA_SHOP_TYPE));
+	}
+
+	/**
+	 * 把村民设为某个店铺的店主：写入类型、挂上店铺名的自定义名、设为不消失。
+	 *
+	 * <p>店铺村民还会 {@code setNoAi(true)} —— 站柜台不动，既不会乱跑串店，
+	 * 也不会走出小屋掉下主岛（交易面板照常能开，右键交互不依赖 AI）。
+	 * 玩家空岛上那只「杂货商人」不调用这个方法，保留闲逛行为。
+	 */
+	public void setShopType(final ShopType type) {
+		this.entityData.set(DATA_SHOP_TYPE, type.id);
+		this.offers = null;
+		this.setCustomName(Component.literal(type.nameZh));
+		this.setCustomNameVisible(true);
+		this.setPersistenceRequired();
+		this.setNoAi(true);
+	}
+
 	// ==================== 交易：物品 -> 硬币 ====================
 
 	@Override
 	public MerchantOffers getOffers() {
 		if (this.offers == null) {
-			this.offers = createTradeOffers();
+			this.offers = ShopTrades.build(this.getShopType());
 		}
 		return this.offers;
-	}
-
-	/**
-	 * 初期交易表：
-	 * <ul>
-	 *   <li>各树种原木（含下界菌柄）以及石头、圆石，每 1 个换 1 枚硬币；</li>
-	 *   <li>反向：10 枚硬币换 1 个树苗 / 种子（全部种类，方便空岛开局补种）。</li>
-	 * </ul>
-	 * 后续要扩展交易（比如用硬币换工具/食物），在这个方法里继续 addOffer / addCoinOffer 即可。
-	 */
-	private static MerchantOffers createTradeOffers() {
-		final MerchantOffers offers = new MerchantOffers();
-		final ItemStack coin = new ItemStack(Cjm_skyisland.COIN);
-
-		// 主世界各树种原木
-		addOffer(offers, Items.OAK_LOG, coin);
-		addOffer(offers, Items.SPRUCE_LOG, coin);
-		addOffer(offers, Items.BIRCH_LOG, coin);
-		addOffer(offers, Items.JUNGLE_LOG, coin);
-		addOffer(offers, Items.ACACIA_LOG, coin);
-		addOffer(offers, Items.DARK_OAK_LOG, coin);
-		addOffer(offers, Items.MANGROVE_LOG, coin);
-		addOffer(offers, Items.CHERRY_LOG, coin);
-		addOffer(offers, Items.PALE_OAK_LOG, coin);
-		addOffer(offers, Items.POPLAR_LOG, coin);
-		// 下界菌柄
-		addOffer(offers, Items.CRIMSON_STEM, coin);
-		addOffer(offers, Items.WARPED_STEM, coin);
-		// 石头
-		addOffer(offers, Items.STONE, coin);
-		addOffer(offers, Items.COBBLESTONE, coin);
-
-		// ============ 反向交易：硬币 -> 树苗 / 种子 ============
-		// 所有树苗：10 硬币换 1 棵
-		addCoinOffer(offers, Items.OAK_SAPLING);
-		addCoinOffer(offers, Items.SPRUCE_SAPLING);
-		addCoinOffer(offers, Items.BIRCH_SAPLING);
-		addCoinOffer(offers, Items.JUNGLE_SAPLING);
-		addCoinOffer(offers, Items.ACACIA_SAPLING);
-		addCoinOffer(offers, Items.DARK_OAK_SAPLING);
-		addCoinOffer(offers, Items.MANGROVE_PROPAGULE); // 红树树苗（ propagule）
-		addCoinOffer(offers, Items.CHERRY_SAPLING);
-		addCoinOffer(offers, Items.PALE_OAK_SAPLING);
-		addCoinOffer(offers, Items.POPLAR_SAPLING);
-		// 所有种子：10 硬币换 1 个
-		addCoinOffer(offers, Items.WHEAT_SEEDS);
-		addCoinOffer(offers, Items.MELON_SEEDS);
-		addCoinOffer(offers, Items.PUMPKIN_SEEDS);
-		addCoinOffer(offers, Items.BEETROOT_SEEDS);
-		addCoinOffer(offers, Items.TORCHFLOWER_SEEDS);
-		addCoinOffer(offers, Items.PITCHER_POD);
-
-		return offers;
-	}
-
-	/** 单条交易：{@code 1 个 cost -> 1 个 result}，无限次、0 经验、不随声望涨价。 */
-	private static void addOffer(MerchantOffers offers, ItemLike cost, ItemStack result) {
-		offers.add(new MerchantOffer(new ItemCost(cost), result.copy(), TRADE_MAX_USES, 0, 0.0F));
-	}
-
-	/** 反向交易：消耗 {@code COIN_COST} 枚硬币，换 1 个 result 物品（树苗 / 种子等）。无限次、0 经验、不涨价。 */
-	private static void addCoinOffer(MerchantOffers offers, ItemLike result) {
-		offers.add(new MerchantOffer(
-				new ItemCost(Cjm_skyisland.COIN, COIN_COST),
-				new ItemStack(result, 1),
-				TRADE_MAX_USES, 0, 0.0F));
 	}
 
 	@Override

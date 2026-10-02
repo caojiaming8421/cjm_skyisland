@@ -98,6 +98,29 @@ public class Cjm_skyisland implements ModInitializer {
 			.noOcclusion())
 	);
 
+	/** 主城传送碑方块 id。 */
+	private static final ResourceKey<Block> TOWN_PORTAL_ID = ResourceKey.create(Registries.BLOCK, id("town_portal"));
+
+	/** 主城传送碑（id: cjm_skyisland:town_portal）：实体石碑，空岛与主城各一座，右键在两者之间传送。 */
+	public static final Block TOWN_PORTAL_BLOCK = Registry.register(
+		BuiltInRegistries.BLOCK,
+		TOWN_PORTAL_ID,
+		new TownPortalBlock(BlockBehaviour.Properties.of()
+			.setId(TOWN_PORTAL_ID)
+			.strength(-1.0F, 3600000.0F)
+			.sound(SoundType.STONE))
+	);
+
+	/** 主城传送碑物品 id。 */
+	private static final ResourceKey<Item> TOWN_PORTAL_ITEM_ID = ResourceKey.create(Registries.ITEM, id("town_portal"));
+
+	/** 主城传送碑的物品形式（创造模式取用）。 */
+	public static final Item TOWN_PORTAL_ITEM = Registry.register(
+		BuiltInRegistries.ITEM,
+		TOWN_PORTAL_ITEM_ID,
+		new BlockItem(TOWN_PORTAL_BLOCK, new Item.Properties().setId(TOWN_PORTAL_ITEM_ID))
+	);
+
 	/** 难度入口物品 id。 */
 	private static final ResourceKey<Item> DUNGEON_CORE_ITEM_ID = ResourceKey.create(Registries.ITEM, id("dungeon_core"));
 
@@ -123,6 +146,7 @@ public class Cjm_skyisland implements ModInitializer {
 				output.accept(CJM_VILLAGER_EGG);
 				output.accept(COIN);
 				output.accept(DUNGEON_CORE_ITEM);
+				output.accept(TOWN_PORTAL_ITEM);
 			})
 			.build()
 	);
@@ -137,6 +161,8 @@ public class Cjm_skyisland implements ModInitializer {
 		IslandSpawner.register();
 		// 副本空岛：传送阵进出、刷怪、奖励箱、规则限制
 		Dungeon.register();
+		// 主岛：200x200 主城岛，启动时生成；店铺村民与往返传送
+		MainIsland.register();
 		// 难度选择网络包（客户端点选难度 -> 服务端扣硬币并送入副本）
 		PayloadTypeRegistry.serverboundPlay().register(SelectDifficultyC2S.TYPE, SelectDifficultyC2S.STREAM_CODEC);
 		ServerPlayNetworking.registerGlobalReceiver(SelectDifficultyC2S.TYPE,

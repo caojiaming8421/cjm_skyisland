@@ -1,0 +1,7 @@
+{
+  "parent": "minecraft:block/cube_all",
+  "textures": {
+    "all": "cjm_skyisland:block/town_portal",
+    "particle": "cjm_skyisland:block/town_portal"
+  }
+}
