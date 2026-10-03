@@ -23,6 +23,7 @@ import net.minecraft.world.level.block.LeavesBlock;
 import net.minecraft.world.level.block.SlabBlock;
 import net.minecraft.world.level.block.StairBlock;
 import net.minecraft.world.level.block.state.BlockState;
+import net.minecraft.world.level.block.state.properties.BlockStateProperties;
 import net.minecraft.world.level.block.state.properties.Half;
 import net.minecraft.world.level.block.state.properties.SlabType;
 import net.minecraft.world.level.chunk.status.ChunkStatus;
@@ -240,6 +241,13 @@ public final class MainIsland {
 			buildDocks(world);
 			buildStreetLamps(world);
 			buildFlowerBoxes(world);
+			buildTrainingGround(world);
+			buildLibrary(world);
+			buildTavern(world);
+			buildFarmFields(world);
+			buildPark(world);
+			buildPlazaBenches(world);
+			buildBraziers(world);
 			buildGrove(world);
 			world.setBlockAndUpdate(portalPos(), Cjm_skyisland.TOWN_PORTAL_BLOCK.defaultBlockState());
 			LOGGER.info("[skyisland] 主岛建筑生成完成（构建版本 {}）", MainIslandConfig.BUILD_VERSION);
@@ -260,7 +268,7 @@ public final class MainIsland {
 	 * （用另一种石砖变体），否则旧档检测不到版本变化、不会翻新。
 	 */
 	private static BlockState buildMarker() {
-		return Blocks.CHISELED_STONE_BRICKS.defaultBlockState();
+		return Blocks.MOSSY_STONE_BRICKS.defaultBlockState();
 	}
 
 	/** 整岛清空：清掉平台以上所有建筑（保留 Y-4 的版本标记），供旧档翻新时重建。 */
@@ -624,7 +632,7 @@ public final class MainIsland {
 		set(world, cx, y + H + 1, cz + h + 1, Blocks.LANTERN.defaultBlockState());
 		set(world, cx, y + H + 2, cz + h + 1, log);
 		set(world, cx, y + H + 3, cz + h + 1, carpet);
-		// 室内：染色地毯 + 精致柜台（栅栏 + 台面）+ 货架（木桶 / 箱子）+ 吊灯
+		// 室内：染色地毯 + 精致柜台（栅栏 + 台面）+ 吊灯（货架按职业在 decorateShop 里细化）
 		for (int dx = -2; dx <= 2; dx++) {
 			for (int dz = -2; dz <= 2; dz++) {
 				set(world, cx + dx, y + 1, cz + dz, carpet);
@@ -634,9 +642,9 @@ public final class MainIsland {
 			world.setBlockAndUpdate(new BlockPos(cx + dx, y + 1, cz + 2), Blocks.DARK_OAK_FENCE.defaultBlockState());
 			world.setBlockAndUpdate(new BlockPos(cx + dx, y + 2, cz + 2), slab(Blocks.DARK_OAK_SLAB, SlabType.BOTTOM));
 		}
-		world.setBlockAndUpdate(new BlockPos(cx - 3, y + 1, cz - 3), Blocks.BARREL.defaultBlockState());
-		world.setBlockAndUpdate(new BlockPos(cx + 3, y + 1, cz - 3), Blocks.CHEST.defaultBlockState());
 		set(world, cx, y + H, cz, Blocks.LANTERN.defaultBlockState());
+		// 按职业做差异化装修（内饰 + 外观）
+		decorateShop(world, shop);
 	}
 
 	/** 沿环形街道外侧错落摆 8 栋民居（无村民），四角稍大、四边中点更小，丰富街区层次。 */
@@ -735,24 +743,30 @@ public final class MainIsland {
 		set(world, cx, roofBase + h, cz, Blocks.LANTERN.defaultBlockState());
 	}
 
-	/** 中央喷泉广场（城堡正门外，传送碑以北）：石砖盆 + 水源 + 中柱。 */
+	/** 中央广场（城堡正门外，传送碑以北）：干喷泉（无水的石砖盆 + 中心石柱灯笼），避免传送点附近出现水。 */
 	private static void buildPlaza(final ServerLevel world) {
 		final int cx = MainIslandConfig.CENTER_X;
 		final int cz = MainIslandConfig.CENTER_Z + 17;
 		final int y = MainIslandConfig.Y;
 		final BlockState brick = Blocks.STONE_BRICKS.defaultBlockState();
-		// 3x3 盆（边缘抬高 1 格）
+		// 3x3 石砖盆（边缘抬高 1 格，盆底铺石砖），中央为干泉眼
 		for (int dx = -1; dx <= 1; dx++) {
 			for (int dz = -1; dz <= 1; dz++) {
+				final boolean edge = dx != 0 || dz != 0;
 				set(world, cx + dx, y + 1, cz + dz, brick);
+				if (edge) {
+					set(world, cx + dx, y, cz + dz, brick); // 盆底
+				}
 			}
 		}
-		set(world, cx, y, cz, water());
-		set(world, cx, y + 1, cz, water());
-		// 中柱
-		set(world, cx, y + 2, cz, Blocks.DARK_OAK_LOG.defaultBlockState());
-		set(world, cx, y + 3, cz, water());
-		set(world, cx, y + 4, cz, Blocks.LANTERN.defaultBlockState());
+		// 中心石柱 + 灯笼（代替原来的水柱）
+		set(world, cx, y + 1, cz, Blocks.DARK_OAK_LOG.defaultBlockState());
+		set(world, cx, y + 2, cz, Blocks.LANTERN.defaultBlockState());
+		// 四角小花盆点缀
+		set(world, cx - 1, y + 1, cz - 1, Blocks.POTTED_DANDELION.defaultBlockState());
+		set(world, cx + 1, y + 1, cz - 1, Blocks.POTTED_POPPY.defaultBlockState());
+		set(world, cx - 1, y + 1, cz + 1, Blocks.POTTED_BLUE_ORCHID.defaultBlockState());
+		set(world, cx + 1, y + 1, cz + 1, Blocks.POTTED_ALLIUM.defaultBlockState());
 	}
 
 	/** 水井：圆石圈 + 原木井架 + 灯笼。 */
@@ -780,28 +794,32 @@ public final class MainIsland {
 		set(world, cx, y + 4, cz, Blocks.LANTERN.defaultBlockState());
 	}
 
-	/** 沿十字主干道摆灯笼柱。 */
+	/** 沿十字主干道摆路灯柱（柱顶加彩色羊毛旗，点缀街区）。 */
 	private static void buildStreetLamps(final ServerLevel world) {
 		final int cx = MainIslandConfig.CENTER_X;
 		final int cz = MainIslandConfig.CENTER_Z;
-		final int y = MainIslandConfig.Y;
+		final DyeColor[] cols = {DyeColor.RED, DyeColor.YELLOW, DyeColor.LIME, DyeColor.CYAN,
+				DyeColor.BLUE, DyeColor.PURPLE, DyeColor.ORANGE, DyeColor.GREEN};
+		int i = 0;
 		for (int d = -80; d <= 80; d += 20) {
 			if (d == 0) {
 				continue;
 			}
-			lampPost(world, cx + d, cz + 8);
-			lampPost(world, cx + 8, cz + d);
-			lampPost(world, cx + d, cz - 8);
-			lampPost(world, cx - 8, cz + d);
+			i = lampPost(world, cx + d, cz + 8, i, cols);
+			i = lampPost(world, cx + 8, cz + d, i, cols);
+			i = lampPost(world, cx + d, cz - 8, i, cols);
+			i = lampPost(world, cx - 8, cz + d, i, cols);
 		}
 	}
 
-	private static void lampPost(final ServerLevel world, final int x, final int z) {
+	private static int lampPost(final ServerLevel world, final int x, final int z, int idx, final DyeColor[] cols) {
 		final int y = MainIslandConfig.Y;
 		for (int dy = 1; dy <= 3; dy++) {
 			set(world, x, y + dy, z, Blocks.DARK_OAK_FENCE.defaultBlockState());
 		}
 		set(world, x, y + 4, z, Blocks.LANTERN.defaultBlockState());
+		set(world, x, y + 5, z, Blocks.WOOL.pick(cols[idx % cols.length]).defaultBlockState());
+		return idx + 1;
 	}
 
 	/** 在空地撒几棵树与花丛，打破单调。 */
@@ -812,7 +830,9 @@ public final class MainIsland {
 		final int[][] spots = new int[][]{
 				{cx - 70, cz}, {cx + 70, cz}, {cx, cz - 70}, {cx, cz + 70},
 				{cx - 40, cz - 40}, {cx + 40, cz + 40}, {cx - 40, cz + 40}, {cx + 40, cz - 40},
-				{cx - 85, cz + 20}, {cx + 20, cz - 85}
+				{cx - 85, cz + 20}, {cx + 20, cz - 85},
+				{cx + 85, cz - 20}, {cx - 20, cz + 85}, {cx + 70, cz + 30}, {cx - 70, cz - 30},
+				{cx + 30, cz + 70}, {cx - 30, cz - 70}
 		};
 		for (final int[] s : spots) {
 			plantTree(world, s[0], y, s[1]);
@@ -1017,6 +1037,275 @@ public final class MainIsland {
 		}
 	}
 
+	// ==================== 店铺：按职业差异化装修 ====================
+
+	/** 按职业给 8 种店铺做不同内饰与外观，让每条街的店都各有特色。 */
+	private static void decorateShop(final ServerLevel world, final ShopDef shop) {
+		final int cx = MainIslandConfig.CENTER_X + shop.offX();
+		final int cz = MainIslandConfig.CENTER_Z + shop.offZ();
+		final int y = MainIslandConfig.Y;
+		final int h = MainIslandConfig.SHOP_HALF;
+		switch (shop.type()) {
+			case BLACKSMITH -> { // 铁匠：铁砧 + 点亮熔炉 + 炉火，烟囱顶营火冒烟
+				set(world, cx, y + 2, cz - 1, Blocks.ANVIL.defaultBlockState());
+				set(world, cx - 3, y + 2, cz - 3, lit(Blocks.FURNACE));
+				set(world, cx + 3, y + 2, cz - 3, lit(Blocks.CAMPFIRE));
+				set(world, cx + h, y + MainIslandConfig.SHOP_HEIGHT + 5, cz + 3, lit(Blocks.CAMPFIRE));
+			}
+			case WEAPONS -> { // 武器：标靶 + 铁/金块陈列 + 铁砧 + 门前红旗
+				set(world, cx, y + 2, cz - 3, Blocks.TARGET.defaultBlockState());
+				set(world, cx - 3, y + 2, cz, Blocks.IRON_BLOCK.defaultBlockState());
+				set(world, cx + 3, y + 2, cz, Blocks.GOLD_BLOCK.defaultBlockState());
+				set(world, cx, y + 2, cz - 1, Blocks.ANVIL.defaultBlockState());
+				flag(world, cx, cz + h + 2, shop.sign());
+			}
+			case ARMOR -> { // 护甲：铁/金块 + 两侧盔甲箱
+				set(world, cx - 3, y + 2, cz - 2, Blocks.IRON_BLOCK.defaultBlockState());
+				set(world, cx + 3, y + 2, cz - 2, Blocks.GOLD_BLOCK.defaultBlockState());
+				set(world, cx - 3, y + 1, cz - 3, Blocks.CHEST.defaultBlockState());
+				set(world, cx + 3, y + 1, cz - 3, Blocks.CHEST.defaultBlockState());
+				flag(world, cx, cz + h + 2, shop.sign());
+			}
+			case BUILDER -> { // 建材：背面材料样品墙 + 工作台 + 两侧桶
+				final net.minecraft.world.level.block.Block[] mats = {Blocks.OAK_PLANKS, Blocks.COBBLESTONE,
+						Blocks.STONE_BRICKS, Blocks.GLASS_PANE, Blocks.SANDSTONE, Blocks.BRICKS, Blocks.DARK_OAK_PLANKS};
+				int mi = 0;
+				for (int dx = -3; dx <= 3; dx++) {
+					set(world, cx + dx, y + 2, cz - 3, mats[mi++ % mats.length].defaultBlockState());
+				}
+				set(world, cx, y + 2, cz - 1, Blocks.CRAFTING_TABLE.defaultBlockState());
+				set(world, cx - 3, y + 1, cz + 3, Blocks.BARREL.defaultBlockState());
+				set(world, cx + 3, y + 1, cz + 3, Blocks.BARREL.defaultBlockState());
+			}
+			case FARMER -> { // 农夫：干草/南瓜/甜瓜 + 堆肥桶 + 室外菜园
+				set(world, cx, y + 2, cz - 1, Blocks.HAY_BLOCK.defaultBlockState());
+				set(world, cx - 3, y + 2, cz - 3, Blocks.PUMPKIN.defaultBlockState());
+				set(world, cx + 3, y + 2, cz - 3, Blocks.MELON.defaultBlockState());
+				set(world, cx, y + 2, cz - 3, Blocks.COMPOSTER.defaultBlockState());
+				buildFarmPlot(world, cx, cz + h + 5);
+			}
+			case POTION -> { // 药水：酿造台 + 锅 + 紫晶/荧石发光陈列
+				set(world, cx, y + 2, cz - 1, Blocks.BREWING_STAND.defaultBlockState());
+				set(world, cx - 3, y + 2, cz - 3, Blocks.CAULDRON.defaultBlockState());
+				set(world, cx + 3, y + 2, cz - 3, Blocks.AMETHYST_BLOCK.defaultBlockState());
+				set(world, cx - 3, y + 2, cz + 1, Blocks.GLOWSTONE.defaultBlockState());
+				set(world, cx + 3, y + 2, cz + 1, Blocks.GLOWSTONE.defaultBlockState());
+				flag(world, cx, cz + h + 2, shop.sign());
+			}
+			case ENCHANTER -> { // 附魔：附魔台 + 书架阵 + 紫晶发光
+				set(world, cx, y + 2, cz - 1, Blocks.ENCHANTING_TABLE.defaultBlockState());
+				set(world, cx - 2, y + 2, cz - 2, Blocks.BOOKSHELF.defaultBlockState());
+				set(world, cx + 2, y + 2, cz - 2, Blocks.BOOKSHELF.defaultBlockState());
+				set(world, cx - 2, y + 2, cz + 1, Blocks.BOOKSHELF.defaultBlockState());
+				set(world, cx + 2, y + 2, cz + 1, Blocks.BOOKSHELF.defaultBlockState());
+				set(world, cx - 3, y + 2, cz, Blocks.AMETHYST_BLOCK.defaultBlockState());
+				set(world, cx + 3, y + 2, cz, Blocks.AMETHYST_BLOCK.defaultBlockState());
+			}
+			case GENERAL -> { // 杂货：满满储物（多桶多箱）+ 工作台
+				set(world, cx - 3, y + 1, cz - 3, Blocks.BARREL.defaultBlockState());
+				set(world, cx + 3, y + 1, cz - 3, Blocks.CHEST.defaultBlockState());
+				set(world, cx - 3, y + 1, cz + 3, Blocks.CHEST.defaultBlockState());
+				set(world, cx + 3, y + 1, cz + 3, Blocks.BARREL.defaultBlockState());
+				set(world, cx, y + 2, cz - 2, Blocks.CRAFTING_TABLE.defaultBlockState());
+				flag(world, cx, cz + h + 2, shop.sign());
+			}
+			default -> { }
+		}
+	}
+
+	// ==================== 主城新增街区（大幅丰富） ====================
+
+	/** 训练场：围栏竞技场 + 四面标靶 + 中央铁砧与铁块武器架。 */
+	private static void buildTrainingGround(final ServerLevel world) {
+		final int cx = MainIslandConfig.CENTER_X;
+		final int cz = MainIslandConfig.CENTER_Z + 40;
+		final int y = MainIslandConfig.Y;
+		for (int dx = -4; dx <= 4; dx++) {
+			for (int dz = -4; dz <= 4; dz++) {
+				final boolean edge = Math.abs(dx) == 4 || Math.abs(dz) == 4;
+				if (edge) {
+					set(world, cx + dx, y + 1, cz + dz, Blocks.DARK_OAK_FENCE.defaultBlockState());
+					set(world, cx + dx, y + 2, cz + dz, Blocks.DARK_OAK_FENCE.defaultBlockState());
+				}
+			}
+		}
+		set(world, cx, y + 2, cz - 3, Blocks.TARGET.defaultBlockState());
+		set(world, cx, y + 2, cz + 3, Blocks.TARGET.defaultBlockState());
+		set(world, cx - 3, y + 2, cz, Blocks.TARGET.defaultBlockState());
+		set(world, cx + 3, y + 2, cz, Blocks.TARGET.defaultBlockState());
+		set(world, cx, y + 2, cz, Blocks.ANVIL.defaultBlockState());
+		set(world, cx - 2, y + 2, cz - 2, Blocks.IRON_BLOCK.defaultBlockState());
+		set(world, cx + 2, y + 2, cz + 2, Blocks.IRON_BLOCK.defaultBlockState());
+	}
+
+	/** 图书馆：石砖小楼，室内三面书架墙 + 中央阅览桌。 */
+	private static void buildLibrary(final ServerLevel world) {
+		final int cx = MainIslandConfig.CENTER_X - 30;
+		final int cz = MainIslandConfig.CENTER_Z - 30;
+		final int y = MainIslandConfig.Y;
+		final int h = 4;
+		final BlockState brick = Blocks.STONE_BRICKS.defaultBlockState();
+		for (int dx = -h; dx <= h; dx++) {
+			for (int dz = -h; dz <= h; dz++) {
+				final boolean edge = Math.abs(dx) == h || Math.abs(dz) == h;
+				if (!edge) {
+					continue;
+				}
+				for (int dy = 1; dy <= 5; dy++) {
+					world.setBlockAndUpdate(new BlockPos(cx + dx, y + dy, cz + dz), brick);
+				}
+				if (dz == h && dx == 0) {
+					for (int dy = 1; dy <= 3; dy++) {
+						world.setBlockAndUpdate(new BlockPos(cx + dx, y + dy, cz + dz), Blocks.AIR.defaultBlockState());
+					}
+				}
+			}
+		}
+		for (int dx = -h; dx <= h; dx++) {
+			for (int dz = -h; dz <= h; dz++) {
+				set(world, cx + dx, y + 6, cz + dz, brick);
+			}
+		}
+		set(world, cx, y + 7, cz, Blocks.LANTERN.defaultBlockState());
+		for (int dx = -3; dx <= 3; dx++) {
+			set(world, cx + dx, y + 2, cz - 3, Blocks.BOOKSHELF.defaultBlockState());
+			set(world, cx + dx, y + 3, cz - 3, Blocks.BOOKSHELF.defaultBlockState());
+			set(world, cx + dx, y + 2, cz + 3, Blocks.BOOKSHELF.defaultBlockState());
+			set(world, cx + dx, y + 3, cz + 3, Blocks.BOOKSHELF.defaultBlockState());
+		}
+		for (int dz = -2; dz <= 2; dz++) {
+			set(world, cx - 3, y + 2, cz + dz, Blocks.BOOKSHELF.defaultBlockState());
+			set(world, cx + 3, y + 2, cz + dz, Blocks.BOOKSHELF.defaultBlockState());
+		}
+		set(world, cx, y + 2, cz - 1, Blocks.CRAFTING_TABLE.defaultBlockState());
+	}
+
+	/** 酒馆：石砖小楼，室内木桶酒桌 + 中央石围壁炉（营火）。 */
+	private static void buildTavern(final ServerLevel world) {
+		final int cx = MainIslandConfig.CENTER_X + 30;
+		final int cz = MainIslandConfig.CENTER_Z + 30;
+		final int y = MainIslandConfig.Y;
+		final int h = 4;
+		final BlockState brick = Blocks.STONE_BRICKS.defaultBlockState();
+		for (int dx = -h; dx <= h; dx++) {
+			for (int dz = -h; dz <= h; dz++) {
+				final boolean edge = Math.abs(dx) == h || Math.abs(dz) == h;
+				if (!edge) {
+					continue;
+				}
+				for (int dy = 1; dy <= 5; dy++) {
+					world.setBlockAndUpdate(new BlockPos(cx + dx, y + dy, cz + dz), brick);
+				}
+				if (dz == h && dx == 0) {
+					for (int dy = 1; dy <= 3; dy++) {
+						world.setBlockAndUpdate(new BlockPos(cx + dx, y + dy, cz + dz), Blocks.AIR.defaultBlockState());
+					}
+				}
+			}
+		}
+		for (int dx = -h; dx <= h; dx++) {
+			for (int dz = -h; dz <= h; dz++) {
+				set(world, cx + dx, y + 6, cz + dz, brick);
+			}
+		}
+		set(world, cx, y + 7, cz, Blocks.LANTERN.defaultBlockState());
+		set(world, cx - 2, y + 2, cz - 2, Blocks.BARREL.defaultBlockState());
+		set(world, cx + 2, y + 2, cz - 2, Blocks.BARREL.defaultBlockState());
+		set(world, cx - 2, y + 2, cz + 2, Blocks.BARREL.defaultBlockState());
+		set(world, cx + 2, y + 2, cz + 2, Blocks.BARREL.defaultBlockState());
+		// 壁炉：营火用圆石四面围住，只冒光不蔓延
+		set(world, cx, y + 1, cz - 1, Blocks.COBBLESTONE.defaultBlockState());
+		set(world, cx, y + 3, cz - 1, Blocks.COBBLESTONE.defaultBlockState());
+		set(world, cx - 1, y + 2, cz - 1, Blocks.COBBLESTONE.defaultBlockState());
+		set(world, cx + 1, y + 2, cz - 1, Blocks.COBBLESTONE.defaultBlockState());
+		set(world, cx, y + 2, cz - 1, lit(Blocks.CAMPFIRE));
+	}
+
+	/** 四块农田：分布在四条主街外延的开阔地，围栏 + 中央水源 + 成熟作物。 */
+	private static void buildFarmFields(final ServerLevel world) {
+		final int cx = MainIslandConfig.CENTER_X;
+		final int cz = MainIslandConfig.CENTER_Z;
+		buildFarmPlot(world, cx, cz - 72);
+		buildFarmPlot(world, cx, cz + 72);
+		buildFarmPlot(world, cx - 72, cz);
+		buildFarmPlot(world, cx + 72, cz);
+	}
+
+	/** 单块 5x5 农田：橡木围栏 + 中央水源（湿润耕地）+ 四周成熟作物。 */
+	private static void buildFarmPlot(final ServerLevel world, final int fx, final int fz) {
+		final int y = MainIslandConfig.Y;
+		for (int dx = -2; dx <= 2; dx++) {
+			for (int dz = -2; dz <= 2; dz++) {
+				final boolean edge = Math.abs(dx) == 2 || Math.abs(dz) == 2;
+				if (edge) {
+					set(world, fx + dx, y + 1, fz + dz, Blocks.OAK_FENCE.defaultBlockState());
+					set(world, fx + dx, y + 2, fz + dz, Blocks.OAK_FENCE.defaultBlockState());
+				}
+			}
+		}
+		set(world, fx, y, fz, water());
+		final BlockState[] c = {crop(Blocks.WHEAT), crop(Blocks.CARROTS), crop(Blocks.POTATOES), crop(Blocks.BEETROOTS)};
+		int i = 0;
+		for (int dx = -1; dx <= 1; dx++) {
+			for (int dz = -1; dz <= 1; dz++) {
+				if (dx == 0 && dz == 0) {
+					continue;
+				}
+				set(world, fx + dx, y, fz + dz, Blocks.FARMLAND.defaultBlockState());
+				set(world, fx + dx, y + 1, fz + dz, c[i++ % c.length]);
+			}
+		}
+	}
+
+	/** 公园（远东北角）：5x5 睡莲池塘 + 岸边长椅 + 树木，远离传送点。 */
+	private static void buildPark(final ServerLevel world) {
+		final int cx = MainIslandConfig.CENTER_X + 86;
+		final int cz = MainIslandConfig.CENTER_Z - 55;
+		final int y = MainIslandConfig.Y;
+		for (int dx = -2; dx <= 2; dx++) {
+			for (int dz = -2; dz <= 2; dz++) {
+				set(world, cx + dx, y, cz + dz, water());
+				if ((dx + dz) % 2 == 0) {
+					set(world, cx + dx, y + 1, cz + dz, Blocks.LILY_PAD.defaultBlockState());
+				}
+			}
+		}
+		bench(world, cx - 4, cz - 2);
+		bench(world, cx + 4, cz + 2);
+		plantTree(world, cx - 5, y, cz + 4);
+		plantTree(world, cx + 5, y, cz - 4);
+	}
+
+	/** 广场长椅：喷泉广场与纪念碑四周摆几张木 stair 长椅。 */
+	private static void buildPlazaBenches(final ServerLevel world) {
+		final int cx = MainIslandConfig.CENTER_X;
+		final int cz = MainIslandConfig.CENTER_Z;
+		bench(world, cx - 4, cz + 14);
+		bench(world, cx + 4, cz + 20);
+		bench(world, cx - 4, cz + 33);
+		bench(world, cx + 4, cz + 27);
+	}
+
+	/** 沿途火盆：十字主街外延摆一圈「圆石座 + 点亮营火 + 铁栅笼」的照明火盆。 */
+	private static void buildBraziers(final ServerLevel world) {
+		final int cx = MainIslandConfig.CENTER_X;
+		final int cz = MainIslandConfig.CENTER_Z;
+		final int y = MainIslandConfig.Y;
+		final int[][] spots = {{40, 0}, {-40, 0}, {0, 40}, {0, -40}, {70, 0}, {-70, 0}, {0, 70}, {0, -70},
+				{40, 40}, {-40, -40}, {40, -40}, {-40, 40}};
+		for (final int[] s : spots) {
+			final int x = cx + s[0];
+			final int z = cz + s[1];
+			set(world, x, y + 1, z, Blocks.COBBLESTONE.defaultBlockState());
+			set(world, x, y + 2, z, lit(Blocks.CAMPFIRE));
+			set(world, x - 1, y + 2, z, Blocks.IRON_BARS.defaultBlockState());
+			set(world, x + 1, y + 2, z, Blocks.IRON_BARS.defaultBlockState());
+			set(world, x, y + 2, z - 1, Blocks.IRON_BARS.defaultBlockState());
+			set(world, x, y + 2, z + 1, Blocks.IRON_BARS.defaultBlockState());
+			set(world, x, y + 3, z, Blocks.IRON_BARS.defaultBlockState());
+		}
+	}
+
 	// ==================== 店铺村民：去重 + 补缺 ====================
 
 	/** 城主坐标（主城正中央）。 */
@@ -1100,6 +1389,31 @@ public final class MainIsland {
 	/** 招牌颜色 → 染色玻璃板（26.x 中染色玻璃板是 ColorCollection，用 pick 取对应颜色）。 */
 	private static BlockState stainedPane(final DyeColor color) {
 		return Blocks.STAINED_GLASS_PANE.pick(color).defaultBlockState();
+	}
+
+	/** 点燃方块（熔炉 / 营火），用于炉火与照明。 */
+	private static BlockState lit(final net.minecraft.world.level.block.Block block) {
+		return block.defaultBlockState().setValue(BlockStateProperties.LIT, true);
+	}
+
+	/** 成熟作物（小麦 / 胡萝卜 / 土豆 / 甜菜），age=7 显示成熟态。 */
+	private static BlockState crop(final net.minecraft.world.level.block.Block block) {
+		return block.defaultBlockState().setValue(BlockStateProperties.AGE_7, 7);
+	}
+
+	/** 门前旗帜：原木杆 + 招牌色羊毛，点缀店铺外观。 */
+	private static void flag(final ServerLevel world, final int x, final int z, final DyeColor color) {
+		final int y = MainIslandConfig.Y;
+		set(world, x, y + 1, z, Blocks.DARK_OAK_FENCE.defaultBlockState());
+		set(world, x, y + 2, z, Blocks.DARK_OAK_FENCE.defaultBlockState());
+		set(world, x, y + 3, z, Blocks.WOOL.pick(color).defaultBlockState());
+	}
+
+	/** 长椅：两片相向楼梯，简单的木坐凳。 */
+	private static void bench(final ServerLevel world, final int x, final int z) {
+		final int y = MainIslandConfig.Y;
+		set(world, x, y + 1, z, stair(Blocks.DARK_OAK_STAIRS, Direction.NORTH));
+		set(world, x, y + 1, z + 1, stair(Blocks.DARK_OAK_STAIRS, Direction.SOUTH));
 	}
 
 	// ==================== 区块加载 ====================
