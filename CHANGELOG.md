@@ -10,6 +10,16 @@
 
 ---
 
+## [1.6.3] - 2026-10-03
+
+修复 1.6.2 进入世界时主岛生成崩溃。
+
+### 修复
+- **主岛生成崩溃**：`buildShop` 中门口石阶误用 `Blocks.STONE_BRICKS`（石砖**块**，无 slab 的 `type` 属性）传给 `slab()` 辅助函数，触发 `IllegalArgumentException: Cannot set property ... SlabType ... as it does not exist in Block{minecraft:stone_bricks}`，导致进入世界时主岛重建直接崩溃。已改为正确的 `Blocks.STONE_BRICK_SLAB`（石砖台阶）
+- 旧档（1.6.2 崩溃时中心草块已写入但版本标记块未写入）进服会因标记不匹配自动触发整岛翻新，装此版后会干净重刷主岛，无需手动删档
+
+---
+
 ## [1.6.2] - 2026-10-02
 
 继续丰富主岛内容，并把店铺做得更小巧精致。

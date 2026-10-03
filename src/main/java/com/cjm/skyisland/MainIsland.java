@@ -577,7 +577,7 @@ public final class MainIsland {
 		}
 		// 门口石阶（南门外，抬高一阶）
 		for (int dx = -1; dx <= 0; dx++) {
-			set(world, cx + dx, y, cz + h + 1, slab(Blocks.STONE_BRICKS, SlabType.TOP));
+			set(world, cx + dx, y, cz + h + 1, slab(Blocks.STONE_BRICK_SLAB, SlabType.TOP));
 		}
 		// 窗台花盆（东西窗外）
 		set(world, cx - h - 1, y + 1, cz, Blocks.POTTED_DANDELION.defaultBlockState());
