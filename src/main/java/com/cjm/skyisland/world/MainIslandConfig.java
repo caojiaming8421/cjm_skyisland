@@ -60,7 +60,7 @@ public final class MainIslandConfig {
 	 * {@code MOSSY_STONE_BRICKS} 作为标记。玩家旧档进服时若检测到标记版本不匹配，
 	 * 主岛会整体翻新（先清空再重建），保证每次更新都能看到最新的主岛外观。
 	 */
-	public static final int BUILD_VERSION = 3;
+	public static final int BUILD_VERSION = 4;
 
 	/** 主城正门外的传送碑位置（相对中心）：dz 为正＝南侧。 */
 	public static final int PORTAL_OFF_Z = 20;

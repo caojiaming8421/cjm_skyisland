@@ -268,7 +268,7 @@ public final class MainIsland {
 	 * （用另一种石砖变体），否则旧档检测不到版本变化、不会翻新。
 	 */
 	private static BlockState buildMarker() {
-		return Blocks.MOSSY_STONE_BRICKS.defaultBlockState();
+		return Blocks.CRACKED_STONE_BRICKS.defaultBlockState();
 	}
 
 	/** 整岛清空：清掉平台以上所有建筑（保留 Y-4 的版本标记），供旧档翻新时重建。 */
@@ -1396,8 +1396,11 @@ public final class MainIsland {
 		return block.defaultBlockState().setValue(BlockStateProperties.LIT, true);
 	}
 
-	/** 成熟作物（小麦 / 胡萝卜 / 土豆 / 甜菜），age=7 显示成熟态。 */
+	/** 成熟作物（小麦 / 胡萝卜 / 土豆 / 甜菜）。注意：甜菜用 AGE_3，其它作物用 AGE_7，属不同属性实例，不能混用。 */
 	private static BlockState crop(final net.minecraft.world.level.block.Block block) {
+		if (block == Blocks.BEETROOTS) {
+			return block.defaultBlockState().setValue(BlockStateProperties.AGE_3, 3);
+		}
 		return block.defaultBlockState().setValue(BlockStateProperties.AGE_7, 7);
 	}
 
