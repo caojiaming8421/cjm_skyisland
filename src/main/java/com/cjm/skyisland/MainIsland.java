@@ -248,6 +248,10 @@ public final class MainIsland {
 			buildPark(world);
 			buildPlazaBenches(world);
 			buildBraziers(world);
+			buildLighthouse(world);
+			buildStable(world);
+			buildOrchard(world);
+			buildKnightStatue(world);
 			buildGrove(world);
 			world.setBlockAndUpdate(portalPos(), Cjm_skyisland.TOWN_PORTAL_BLOCK.defaultBlockState());
 			LOGGER.info("[skyisland] 主岛建筑生成完成（构建版本 {}）", MainIslandConfig.BUILD_VERSION);
@@ -268,7 +272,7 @@ public final class MainIsland {
 	 * （用另一种石砖变体），否则旧档检测不到版本变化、不会翻新。
 	 */
 	private static BlockState buildMarker() {
-		return Blocks.CRACKED_STONE_BRICKS.defaultBlockState();
+		return Blocks.END_STONE_BRICKS.defaultBlockState();
 	}
 
 	/** 整岛清空：清掉平台以上所有建筑（保留 Y-4 的版本标记），供旧档翻新时重建。 */
@@ -520,8 +524,8 @@ public final class MainIsland {
 	}
 
 	/**
-	 * 单个店铺：小而精致的中世纪木筋墙小屋（9x9）。
-	 * 细节：四角原木立柱 + 下部圆石裙墙 + 中部原木腰线（木筋感）、石阶门廊、东西窗带原木窗框与窗台花盆、
+	 * 单个店铺：小而精致的中世纪木筋墙小屋（9x9）。门开在朝向中心的一面（局部坐标 + dir 旋转）。
+	 * 细节：四角原木立柱 + 下部圆石裙墙 + 中部原木腰线（木筋感）、石阶门廊、侧面窗带原木窗框与窗台花盆、
 	 * 出挑屋檐、陡山墙、烟囱灯笼、门上方悬挂「原木托 + 招牌色羊毛 + 灯笼」、室内染色地毯 + 精致柜台货架吊灯。
 	 */
 	private static void buildShop(final ServerLevel world, final ShopDef shop) {
@@ -530,6 +534,7 @@ public final class MainIsland {
 		final int y = MainIslandConfig.Y;
 		final int h = MainIslandConfig.SHOP_HALF;
 		final int H = MainIslandConfig.SHOP_HEIGHT;
+		final Direction dir = doorDirFor(cx, cz);
 		final BlockState brick = Blocks.STONE_BRICKS.defaultBlockState();
 		final BlockState cobble = Blocks.COBBLESTONE.defaultBlockState();
 		final BlockState log = Blocks.DARK_OAK_LOG.defaultBlockState();
@@ -538,29 +543,29 @@ public final class MainIsland {
 		final BlockState carpet = Blocks.WOOL.pick(shop.sign()).defaultBlockState();
 
 		// 地基（圆石，四角石砖）
-		for (int dx = -h; dx <= h; dx++) {
-			for (int dz = -h; dz <= h; dz++) {
-				final boolean corner = (dx == -h || dx == h) && (dz == -h || dz == h);
-				world.setBlockAndUpdate(new BlockPos(cx + dx, y, cz + dz), corner ? brick : cobble);
+		for (int lx = -h; lx <= h; lx++) {
+			for (int lz = -h; lz <= h; lz++) {
+				final boolean corner = (Math.abs(lx) == h) && (Math.abs(lz) == h);
+				lp(world, cx, cz, dir, y, lx, lz, corner ? brick : cobble);
 			}
 		}
-		// 墙体 + 木筋
-		for (int dx = -h; dx <= h; dx++) {
-			for (int dz = -h; dz <= h; dz++) {
-				final boolean edge = dx == -h || dx == h || dz == -h || dz == h;
+		// 墙体 + 木筋（lz=+h 是门面，门宽沿侧面 2 格；|lx|=h 是侧面墙，中点开窗）
+		for (int lx = -h; lx <= h; lx++) {
+			for (int lz = -h; lz <= h; lz++) {
+				final boolean edge = Math.abs(lx) == h || Math.abs(lz) == h;
 				if (!edge) {
 					continue;
 				}
-				final boolean corner = (dx == -h || dx == h) && (dz == -h || dz == h);
-				final boolean doorway = dz == h && dx >= -1 && dx <= 0; // 南门 2 宽
-				final boolean window = (dx == -h || dx == h) && dz == 0; // 东西窗
+				final boolean corner = (Math.abs(lx) == h) && (Math.abs(lz) == h);
+				final boolean doorway = (lz == h) && (lx >= -1 && lx <= 0);
+				final boolean window = (Math.abs(lx) == h) && (lz == 0);
 				for (int dy = 1; dy <= H; dy++) {
 					if (doorway && dy <= 3) {
-						world.setBlockAndUpdate(new BlockPos(cx + dx, y + dy, cz + dz), Blocks.AIR.defaultBlockState());
+						lp(world, cx, cz, dir, y + dy, lx, lz, Blocks.AIR.defaultBlockState());
 						continue;
 					}
 					if (window && dy == 3) {
-						world.setBlockAndUpdate(new BlockPos(cx + dx, y + dy, cz + dz), pane); // 彩色玻璃
+						lp(world, cx, cz, dir, y + dy, lx, lz, pane); // 彩色玻璃
 						continue;
 					}
 					final BlockState mat;
@@ -575,76 +580,75 @@ public final class MainIsland {
 					} else {
 						mat = brick;
 					}
-					world.setBlockAndUpdate(new BlockPos(cx + dx, y + dy, cz + dz), mat);
+					lp(world, cx, cz, dir, y + dy, lx, lz, mat);
 				}
-				// 南门门楣（dy=4 原木）
 				if (doorway) {
-					world.setBlockAndUpdate(new BlockPos(cx + dx, y + 4, cz + dz), log);
+					lp(world, cx, cz, dir, y + 4, lx, lz, log); // 门楣
 				}
 			}
 		}
-		// 门口石阶（南门外，抬高一阶）
-		for (int dx = -1; dx <= 0; dx++) {
-			set(world, cx + dx, y, cz + h + 1, slab(Blocks.STONE_BRICK_SLAB, SlabType.TOP));
+		// 门口石阶（门前，沿侧面 2 格）
+		for (int lx = -1; lx <= 0; lx++) {
+			lp(world, cx, cz, dir, y, lx, h + 1, slab(Blocks.STONE_BRICK_SLAB, SlabType.TOP));
 		}
-		// 窗台花盆（东西窗外）
-		set(world, cx - h - 1, y + 1, cz, Blocks.POTTED_DANDELION.defaultBlockState());
-		set(world, cx + h + 1, y + 1, cz, Blocks.POTTED_POPPY.defaultBlockState());
-		// 屋顶：陡山墙（暗橡木楼梯，南北向屋脊），屋檐 slab 出挑
+		// 窗台花盆（两侧面墙外）
+		lp(world, cx, cz, dir, y + 1, h + 1, 0, Blocks.POTTED_DANDELION.defaultBlockState());
+		lp(world, cx, cz, dir, y + 1, -(h + 1), 0, Blocks.POTTED_POPPY.defaultBlockState());
+		// 屋顶：陡山墙，山墙在门面/后墙两端（lz=±h），屋脊沿 lz 中线
 		final int roofBase = y + H + 1;
 		final int rise = h;
-		for (int dz = -h; dz <= h; dz++) {
+		for (int lz = -h; lz <= h; lz++) {
 			for (int dd = 0; dd <= h; dd++) {
 				if (dd == h) {
-					if (dz > -h && dz < h) {
-						set(world, cx + dd, roofBase, cz + dz, slab(Blocks.DARK_OAK_SLAB, SlabType.TOP));
-						set(world, cx - dd, roofBase, cz + dz, slab(Blocks.DARK_OAK_SLAB, SlabType.TOP));
+					if (lz > -h && lz < h) {
+						lp(world, cx, cz, dir, roofBase, dd, lz, slab(Blocks.DARK_OAK_SLAB, SlabType.TOP));
+						lp(world, cx, cz, dir, roofBase, -dd, lz, slab(Blocks.DARK_OAK_SLAB, SlabType.TOP));
 					}
 					continue;
 				}
 				final int ry = roofBase + Math.min(h - dd, rise);
 				if (dd == 0) {
-					if (dz > -h && dz < h) {
-						set(world, cx, ry, cz + dz, plank); // 屋脊
+					if (lz > -h && lz < h) {
+						lp(world, cx, cz, dir, ry, 0, lz, plank); // 屋脊
 					}
 					continue;
 				}
-				set(world, cx + dd, ry, cz + dz, stair(Blocks.DARK_OAK_STAIRS, Direction.EAST));
-				set(world, cx - dd, ry, cz + dz, stair(Blocks.DARK_OAK_STAIRS, Direction.WEST));
+				lp(world, cx, cz, dir, ry, dd, lz, stair(Blocks.DARK_OAK_STAIRS, Direction.EAST));
+				lp(world, cx, cz, dir, ry, -dd, lz, stair(Blocks.DARK_OAK_STAIRS, Direction.WEST));
 			}
 		}
-		// 山墙封三角（z = ±h 两端）
-		for (final int end : new int[]{-h, h}) {
+		// 山墙封三角（lz=±h 两端）
+		for (final int end : new int[]{h, -h}) {
 			for (int dd = 0; dd <= h; dd++) {
 				final int ry = roofBase + Math.min(h - dd, rise);
 				for (int yy = roofBase; yy < ry; yy++) {
-					set(world, cx + dd, yy, cz + end, brick);
-					set(world, cx - dd, yy, cz + end, brick);
+					lp(world, cx, cz, dir, yy, dd, end, brick);
+					lp(world, cx, cz, dir, yy, -dd, end, brick);
 				}
 			}
 		}
-		// 烟囱（东墙外、避开窗的格 + 灯笼顶）
+		// 烟囱（侧面墙外 lx=h+1, lz=3 + 灯笼顶）
 		for (int dy = roofBase; dy <= roofBase + 3; dy++) {
-			set(world, cx + h, dy, cz + 3, brick);
+			lp(world, cx, cz, dir, dy, h + 1, 3, brick);
 		}
-		set(world, cx + h, roofBase + 4, cz + 3, Blocks.LANTERN.defaultBlockState());
-		// 悬挂招牌：门上方灯笼（照亮门口）+ 原木托 + 招牌色羊毛
-		set(world, cx, y + H + 1, cz + h + 1, Blocks.LANTERN.defaultBlockState());
-		set(world, cx, y + H + 2, cz + h + 1, log);
-		set(world, cx, y + H + 3, cz + h + 1, carpet);
-		// 室内：染色地毯 + 精致柜台（栅栏 + 台面）+ 吊灯（货架按职业在 decorateShop 里细化）
-		for (int dx = -2; dx <= 2; dx++) {
-			for (int dz = -2; dz <= 2; dz++) {
-				set(world, cx + dx, y + 1, cz + dz, carpet);
+		lp(world, cx, cz, dir, roofBase + 4, h + 1, 3, Blocks.LANTERN.defaultBlockState());
+		// 悬挂招牌：门前上方灯笼（照亮门口）+ 原木托 + 招牌色羊毛
+		lp(world, cx, cz, dir, y + H + 1, 0, h + 1, Blocks.LANTERN.defaultBlockState());
+		lp(world, cx, cz, dir, y + H + 2, 0, h + 1, log);
+		lp(world, cx, cz, dir, y + H + 3, 0, h + 1, carpet);
+		// 室内：染色地毯 + 精致柜台（靠门面 lz=h-2，沿侧面 5 宽）+ 吊灯（中央）
+		for (int lx = -2; lx <= 2; lx++) {
+			for (int lz = -2; lz <= 2; lz++) {
+				lp(world, cx, cz, dir, y + 1, lx, lz, carpet);
 			}
 		}
-		for (int dx = -2; dx <= 2; dx++) {
-			world.setBlockAndUpdate(new BlockPos(cx + dx, y + 1, cz + 2), Blocks.DARK_OAK_FENCE.defaultBlockState());
-			world.setBlockAndUpdate(new BlockPos(cx + dx, y + 2, cz + 2), slab(Blocks.DARK_OAK_SLAB, SlabType.BOTTOM));
+		for (int lx = -2; lx <= 2; lx++) {
+			lp(world, cx, cz, dir, y + 1, lx, h - 2, Blocks.DARK_OAK_FENCE.defaultBlockState());
+			lp(world, cx, cz, dir, y + 2, lx, h - 2, slab(Blocks.DARK_OAK_SLAB, SlabType.BOTTOM));
 		}
-		set(world, cx, y + H, cz, Blocks.LANTERN.defaultBlockState());
-		// 按职业做差异化装修（内饰 + 外观）
-		decorateShop(world, shop);
+		lp(world, cx, cz, dir, y + H, 0, 0, Blocks.LANTERN.defaultBlockState());
+		// 按职业做差异化装修（内饰 + 外观），门面方向已随 dir 旋转
+		decorateShop(world, shop, dir, cx, cz);
 	}
 
 	/** 沿环形街道外侧错落摆 8 栋民居（无村民），四角稍大、四边中点更小，丰富街区层次。 */
@@ -661,38 +665,39 @@ public final class MainIsland {
 		buildHouse(world, cx, cz + 88, 3);
 	}
 
-	/** 一栋中世纪民居（半宽 h，山墙屋顶 + 原木角柱 + 木筋腰线 + 门窗 + 灯笼），h 越小越精致。 */
+	/** 一栋中世纪民居（半宽 h，山墙屋顶 + 原木角柱 + 木筋腰线 + 门窗 + 灯笼），h 越小越精致。门开在朝向中心的一面。 */
 	private static void buildHouse(final ServerLevel world, final int cx, final int cz, final int h) {
 		final int y = MainIslandConfig.Y;
+		final Direction dir = doorDirFor(cx, cz);
 		final BlockState brick = Blocks.STONE_BRICKS.defaultBlockState();
 		final BlockState cobble = Blocks.COBBLESTONE.defaultBlockState();
 		final BlockState log = Blocks.DARK_OAK_LOG.defaultBlockState();
 		final BlockState plank = Blocks.DARK_OAK_PLANKS.defaultBlockState();
 		final int H = h;
 		// 地基（圆石，四角石砖）
-		for (int dx = -h; dx <= h; dx++) {
-			for (int dz = -h; dz <= h; dz++) {
-				final boolean corner = (dx == -h || dx == h) && (dz == -h || dz == h);
-				world.setBlockAndUpdate(new BlockPos(cx + dx, y, cz + dz), corner ? brick : cobble);
+		for (int lx = -h; lx <= h; lx++) {
+			for (int lz = -h; lz <= h; lz++) {
+				final boolean corner = (Math.abs(lx) == h) && (Math.abs(lz) == h);
+				lp(world, cx, cz, dir, y, lx, lz, corner ? brick : cobble);
 			}
 		}
-		// 墙体
-		for (int dx = -h; dx <= h; dx++) {
-			for (int dz = -h; dz <= h; dz++) {
-				final boolean edge = dx == -h || dx == h || dz == -h || dz == h;
+		// 墙体（lz=+h 门面，门宽 1；|lx|=h 侧面墙中点窗）
+		for (int lx = -h; lx <= h; lx++) {
+			for (int lz = -h; lz <= h; lz++) {
+				final boolean edge = Math.abs(lx) == h || Math.abs(lz) == h;
 				if (!edge) {
 					continue;
 				}
-				final boolean corner = (dx == -h || dx == h) && (dz == -h || dz == h);
-				final boolean doorway = dz == h && dx == 0;
-				final boolean window = (dx == -h || dx == h) && dz == 0;
+				final boolean corner = (Math.abs(lx) == h) && (Math.abs(lz) == h);
+				final boolean doorway = (lz == h) && (lx == 0);
+				final boolean window = (Math.abs(lx) == h) && (lz == 0);
 				for (int dy = 1; dy <= H; dy++) {
 					if (doorway && dy <= 3) {
-						world.setBlockAndUpdate(new BlockPos(cx + dx, y + dy, cz + dz), Blocks.AIR.defaultBlockState());
+						lp(world, cx, cz, dir, y + dy, lx, lz, Blocks.AIR.defaultBlockState());
 						continue;
 					}
 					if (window && dy == (H / 2 + 1)) {
-						world.setBlockAndUpdate(new BlockPos(cx + dx, y + dy, cz + dz), Blocks.GLASS_PANE.defaultBlockState());
+						lp(world, cx, cz, dir, y + dy, lx, lz, Blocks.GLASS_PANE.defaultBlockState());
 						continue;
 					}
 					final BlockState mat;
@@ -705,42 +710,47 @@ public final class MainIsland {
 					} else {
 						mat = brick;
 					}
-					world.setBlockAndUpdate(new BlockPos(cx + dx, y + dy, cz + dz), mat);
+					lp(world, cx, cz, dir, y + dy, lx, lz, mat);
+				}
+				if (doorway) {
+					lp(world, cx, cz, dir, y + H + 1, lx, lz, log); // 门楣（顶部原木）
 				}
 			}
 		}
-		// 屋顶
+		// 门口石阶
+		lp(world, cx, cz, dir, y, 0, h + 1, slab(Blocks.STONE_BRICK_SLAB, SlabType.TOP));
+		// 屋顶（局部山墙，山墙在 lz=±h 两端）
 		final int roofBase = y + H + 1;
-		for (int dz = -h; dz <= h; dz++) {
+		for (int lz = -h; lz <= h; lz++) {
 			for (int dd = 0; dd <= h; dd++) {
 				if (dd == h) {
-					if (dz > -h && dz < h) {
-						set(world, cx + dd, roofBase, cz + dz, slab(Blocks.DARK_OAK_SLAB, SlabType.TOP));
-						set(world, cx - dd, roofBase, cz + dz, slab(Blocks.DARK_OAK_SLAB, SlabType.TOP));
+					if (lz > -h && lz < h) {
+						lp(world, cx, cz, dir, roofBase, dd, lz, slab(Blocks.DARK_OAK_SLAB, SlabType.TOP));
+						lp(world, cx, cz, dir, roofBase, -dd, lz, slab(Blocks.DARK_OAK_SLAB, SlabType.TOP));
 					}
 					continue;
 				}
 				final int ry = roofBase + Math.min(h - dd, h);
 				if (dd == 0) {
-					if (dz > -h && dz < h) {
-						set(world, cx, ry, cz + dz, plank);
+					if (lz > -h && lz < h) {
+						lp(world, cx, cz, dir, ry, 0, lz, plank);
 					}
 					continue;
 				}
-				set(world, cx + dd, ry, cz + dz, stair(Blocks.DARK_OAK_STAIRS, Direction.EAST));
-				set(world, cx - dd, ry, cz + dz, stair(Blocks.DARK_OAK_STAIRS, Direction.WEST));
+				lp(world, cx, cz, dir, ry, dd, lz, stair(Blocks.DARK_OAK_STAIRS, Direction.EAST));
+				lp(world, cx, cz, dir, ry, -dd, lz, stair(Blocks.DARK_OAK_STAIRS, Direction.WEST));
 			}
 		}
-		for (final int end : new int[]{-h, h}) {
+		for (final int end : new int[]{h, -h}) {
 			for (int dd = 0; dd <= h; dd++) {
 				final int ry = roofBase + Math.min(h - dd, h);
 				for (int yy = roofBase; yy < ry; yy++) {
-					set(world, cx + dd, yy, cz + end, brick);
-					set(world, cx - dd, yy, cz + end, brick);
+					lp(world, cx, cz, dir, yy, dd, end, brick);
+					lp(world, cx, cz, dir, yy, -dd, end, brick);
 				}
 			}
 		}
-		set(world, cx, roofBase + h, cz, Blocks.LANTERN.defaultBlockState());
+		lp(world, cx, cz, dir, roofBase + h, 0, 0, Blocks.LANTERN.defaultBlockState());
 	}
 
 	/** 中央广场（城堡正门外，传送碑以北）：干喷泉（无水的石砖盆 + 中心石柱灯笼），避免传送点附近出现水。 */
@@ -1040,77 +1050,84 @@ public final class MainIsland {
 	// ==================== 店铺：按职业差异化装修 ====================
 
 	/** 按职业给 8 种店铺做不同内饰与外观，让每条街的店都各有特色。 */
-	private static void decorateShop(final ServerLevel world, final ShopDef shop) {
-		final int cx = MainIslandConfig.CENTER_X + shop.offX();
-		final int cz = MainIslandConfig.CENTER_Z + shop.offZ();
+	/** 按职业给 8 种店铺做不同内饰与外观，让每条街的店都各有特色。门面方向随 dir 旋转。 */
+	private static void decorateShop(final ServerLevel world, final ShopDef shop, final Direction dir, final int cx, final int cz) {
 		final int y = MainIslandConfig.Y;
 		final int h = MainIslandConfig.SHOP_HALF;
+		// 局部坐标 (lx, lz)：lz=+h 是门面，lz 越小越靠后墙（与 buildShop 一致）
 		switch (shop.type()) {
 			case BLACKSMITH -> { // 铁匠：铁砧 + 点亮熔炉 + 炉火，烟囱顶营火冒烟
-				set(world, cx, y + 2, cz - 1, Blocks.ANVIL.defaultBlockState());
-				set(world, cx - 3, y + 2, cz - 3, lit(Blocks.FURNACE));
-				set(world, cx + 3, y + 2, cz - 3, lit(Blocks.CAMPFIRE));
-				set(world, cx + h, y + MainIslandConfig.SHOP_HEIGHT + 5, cz + 3, lit(Blocks.CAMPFIRE));
+				lp(world, cx, cz, dir, y + 2, 0, -1, Blocks.ANVIL.defaultBlockState());
+				lp(world, cx, cz, dir, y + 2, -3, -3, lit(Blocks.FURNACE));
+				lp(world, cx, cz, dir, y + 2, 3, -3, lit(Blocks.CAMPFIRE));
+				lp(world, cx, cz, dir, y + MainIslandConfig.SHOP_HEIGHT + 5, h + 1, 3, lit(Blocks.CAMPFIRE));
 			}
-			case WEAPONS -> { // 武器：标靶 + 铁/金块陈列 + 铁砧 + 门前红旗
-				set(world, cx, y + 2, cz - 3, Blocks.TARGET.defaultBlockState());
-				set(world, cx - 3, y + 2, cz, Blocks.IRON_BLOCK.defaultBlockState());
-				set(world, cx + 3, y + 2, cz, Blocks.GOLD_BLOCK.defaultBlockState());
-				set(world, cx, y + 2, cz - 1, Blocks.ANVIL.defaultBlockState());
-				flag(world, cx, cz + h + 2, shop.sign());
+			case WEAPONS -> { // 武器：标靶 + 铁/金块陈列 + 铁砧 + 门前旗
+				lp(world, cx, cz, dir, y + 2, 0, -3, Blocks.TARGET.defaultBlockState());
+				lp(world, cx, cz, dir, y + 2, -3, 0, Blocks.IRON_BLOCK.defaultBlockState());
+				lp(world, cx, cz, dir, y + 2, 3, 0, Blocks.GOLD_BLOCK.defaultBlockState());
+				lp(world, cx, cz, dir, y + 2, 0, -1, Blocks.ANVIL.defaultBlockState());
+				doorFlag(world, cx, cz, dir, h, shop.sign());
 			}
 			case ARMOR -> { // 护甲：铁/金块 + 两侧盔甲箱
-				set(world, cx - 3, y + 2, cz - 2, Blocks.IRON_BLOCK.defaultBlockState());
-				set(world, cx + 3, y + 2, cz - 2, Blocks.GOLD_BLOCK.defaultBlockState());
-				set(world, cx - 3, y + 1, cz - 3, Blocks.CHEST.defaultBlockState());
-				set(world, cx + 3, y + 1, cz - 3, Blocks.CHEST.defaultBlockState());
-				flag(world, cx, cz + h + 2, shop.sign());
+				lp(world, cx, cz, dir, y + 2, -3, -2, Blocks.IRON_BLOCK.defaultBlockState());
+				lp(world, cx, cz, dir, y + 2, 3, -2, Blocks.GOLD_BLOCK.defaultBlockState());
+				lp(world, cx, cz, dir, y + 1, -3, -3, Blocks.CHEST.defaultBlockState());
+				lp(world, cx, cz, dir, y + 1, 3, -3, Blocks.CHEST.defaultBlockState());
+				doorFlag(world, cx, cz, dir, h, shop.sign());
 			}
 			case BUILDER -> { // 建材：背面材料样品墙 + 工作台 + 两侧桶
 				final net.minecraft.world.level.block.Block[] mats = {Blocks.OAK_PLANKS, Blocks.COBBLESTONE,
 						Blocks.STONE_BRICKS, Blocks.GLASS_PANE, Blocks.SANDSTONE, Blocks.BRICKS, Blocks.DARK_OAK_PLANKS};
 				int mi = 0;
-				for (int dx = -3; dx <= 3; dx++) {
-					set(world, cx + dx, y + 2, cz - 3, mats[mi++ % mats.length].defaultBlockState());
+				for (int lx = -3; lx <= 3; lx++) {
+					lp(world, cx, cz, dir, y + 2, lx, -3, mats[mi++ % mats.length].defaultBlockState());
 				}
-				set(world, cx, y + 2, cz - 1, Blocks.CRAFTING_TABLE.defaultBlockState());
-				set(world, cx - 3, y + 1, cz + 3, Blocks.BARREL.defaultBlockState());
-				set(world, cx + 3, y + 1, cz + 3, Blocks.BARREL.defaultBlockState());
+				lp(world, cx, cz, dir, y + 2, 0, -1, Blocks.CRAFTING_TABLE.defaultBlockState());
+				lp(world, cx, cz, dir, y + 1, -3, 3, Blocks.BARREL.defaultBlockState());
+				lp(world, cx, cz, dir, y + 1, 3, 3, Blocks.BARREL.defaultBlockState());
 			}
-			case FARMER -> { // 农夫：干草/南瓜/甜瓜 + 堆肥桶 + 室外菜园
-				set(world, cx, y + 2, cz - 1, Blocks.HAY_BLOCK.defaultBlockState());
-				set(world, cx - 3, y + 2, cz - 3, Blocks.PUMPKIN.defaultBlockState());
-				set(world, cx + 3, y + 2, cz - 3, Blocks.MELON.defaultBlockState());
-				set(world, cx, y + 2, cz - 3, Blocks.COMPOSTER.defaultBlockState());
-				buildFarmPlot(world, cx, cz + h + 5);
+			case FARMER -> { // 农夫：干草/南瓜/甜瓜 + 堆肥桶 + 室外菜园（门前外侧）
+				lp(world, cx, cz, dir, y + 2, 0, -1, Blocks.HAY_BLOCK.defaultBlockState());
+				lp(world, cx, cz, dir, y + 2, -3, -3, Blocks.PUMPKIN.defaultBlockState());
+				lp(world, cx, cz, dir, y + 2, 3, -3, Blocks.MELON.defaultBlockState());
+				lp(world, cx, cz, dir, y + 2, 0, -3, Blocks.COMPOSTER.defaultBlockState());
+				final int[] fp = lpPos(cx, cz, dir, 0, h + 5);
+				buildFarmPlot(world, fp[0], fp[1]);
 			}
 			case POTION -> { // 药水：酿造台 + 锅 + 紫晶/荧石发光陈列
-				set(world, cx, y + 2, cz - 1, Blocks.BREWING_STAND.defaultBlockState());
-				set(world, cx - 3, y + 2, cz - 3, Blocks.CAULDRON.defaultBlockState());
-				set(world, cx + 3, y + 2, cz - 3, Blocks.AMETHYST_BLOCK.defaultBlockState());
-				set(world, cx - 3, y + 2, cz + 1, Blocks.GLOWSTONE.defaultBlockState());
-				set(world, cx + 3, y + 2, cz + 1, Blocks.GLOWSTONE.defaultBlockState());
-				flag(world, cx, cz + h + 2, shop.sign());
+				lp(world, cx, cz, dir, y + 2, 0, -1, Blocks.BREWING_STAND.defaultBlockState());
+				lp(world, cx, cz, dir, y + 2, -3, -3, Blocks.CAULDRON.defaultBlockState());
+				lp(world, cx, cz, dir, y + 2, 3, -3, Blocks.AMETHYST_BLOCK.defaultBlockState());
+				lp(world, cx, cz, dir, y + 2, -3, 1, Blocks.GLOWSTONE.defaultBlockState());
+				lp(world, cx, cz, dir, y + 2, 3, 1, Blocks.GLOWSTONE.defaultBlockState());
+				doorFlag(world, cx, cz, dir, h, shop.sign());
 			}
 			case ENCHANTER -> { // 附魔：附魔台 + 书架阵 + 紫晶发光
-				set(world, cx, y + 2, cz - 1, Blocks.ENCHANTING_TABLE.defaultBlockState());
-				set(world, cx - 2, y + 2, cz - 2, Blocks.BOOKSHELF.defaultBlockState());
-				set(world, cx + 2, y + 2, cz - 2, Blocks.BOOKSHELF.defaultBlockState());
-				set(world, cx - 2, y + 2, cz + 1, Blocks.BOOKSHELF.defaultBlockState());
-				set(world, cx + 2, y + 2, cz + 1, Blocks.BOOKSHELF.defaultBlockState());
-				set(world, cx - 3, y + 2, cz, Blocks.AMETHYST_BLOCK.defaultBlockState());
-				set(world, cx + 3, y + 2, cz, Blocks.AMETHYST_BLOCK.defaultBlockState());
+				lp(world, cx, cz, dir, y + 2, 0, -1, Blocks.ENCHANTING_TABLE.defaultBlockState());
+				lp(world, cx, cz, dir, y + 2, -2, -2, Blocks.BOOKSHELF.defaultBlockState());
+				lp(world, cx, cz, dir, y + 2, 2, -2, Blocks.BOOKSHELF.defaultBlockState());
+				lp(world, cx, cz, dir, y + 2, -2, 1, Blocks.BOOKSHELF.defaultBlockState());
+				lp(world, cx, cz, dir, y + 2, 2, 1, Blocks.BOOKSHELF.defaultBlockState());
+				lp(world, cx, cz, dir, y + 2, -3, 0, Blocks.AMETHYST_BLOCK.defaultBlockState());
+				lp(world, cx, cz, dir, y + 2, 3, 0, Blocks.AMETHYST_BLOCK.defaultBlockState());
 			}
 			case GENERAL -> { // 杂货：满满储物（多桶多箱）+ 工作台
-				set(world, cx - 3, y + 1, cz - 3, Blocks.BARREL.defaultBlockState());
-				set(world, cx + 3, y + 1, cz - 3, Blocks.CHEST.defaultBlockState());
-				set(world, cx - 3, y + 1, cz + 3, Blocks.CHEST.defaultBlockState());
-				set(world, cx + 3, y + 1, cz + 3, Blocks.BARREL.defaultBlockState());
-				set(world, cx, y + 2, cz - 2, Blocks.CRAFTING_TABLE.defaultBlockState());
-				flag(world, cx, cz + h + 2, shop.sign());
+				lp(world, cx, cz, dir, y + 1, -3, -3, Blocks.BARREL.defaultBlockState());
+				lp(world, cx, cz, dir, y + 1, 3, -3, Blocks.CHEST.defaultBlockState());
+				lp(world, cx, cz, dir, y + 1, -3, 3, Blocks.CHEST.defaultBlockState());
+				lp(world, cx, cz, dir, y + 1, 3, 3, Blocks.BARREL.defaultBlockState());
+				lp(world, cx, cz, dir, y + 2, 0, -2, Blocks.CRAFTING_TABLE.defaultBlockState());
+				doorFlag(world, cx, cz, dir, h, shop.sign());
 			}
 			default -> { }
 		}
+	}
+
+	/** 门前旗帜：挂在门面外侧（lz = h+2）的招牌色羊毛旗。 */
+	private static void doorFlag(final ServerLevel world, final int cx, final int cz, final Direction dir, final int h, final DyeColor color) {
+		final int[] fp = lpPos(cx, cz, dir, 0, h + 2);
+		flag(world, fp[0], fp[1], color);
 	}
 
 	// ==================== 主城新增街区（大幅丰富） ====================
@@ -1138,87 +1155,170 @@ public final class MainIsland {
 		set(world, cx + 2, y + 2, cz + 2, Blocks.IRON_BLOCK.defaultBlockState());
 	}
 
-	/** 图书馆：石砖小楼，室内三面书架墙 + 中央阅览桌。 */
+	/** 图书馆：石砖小楼，室内三面书架墙 + 中央阅览桌。门开在朝向中心的一面。 */
 	private static void buildLibrary(final ServerLevel world) {
 		final int cx = MainIslandConfig.CENTER_X - 30;
 		final int cz = MainIslandConfig.CENTER_Z - 30;
 		final int y = MainIslandConfig.Y;
+		final Direction dir = doorDirFor(cx, cz);
 		final int h = 4;
 		final BlockState brick = Blocks.STONE_BRICKS.defaultBlockState();
-		for (int dx = -h; dx <= h; dx++) {
-			for (int dz = -h; dz <= h; dz++) {
-				final boolean edge = Math.abs(dx) == h || Math.abs(dz) == h;
+		for (int lx = -h; lx <= h; lx++) {
+			for (int lz = -h; lz <= h; lz++) {
+				final boolean edge = Math.abs(lx) == h || Math.abs(lz) == h;
 				if (!edge) {
 					continue;
 				}
 				for (int dy = 1; dy <= 5; dy++) {
-					world.setBlockAndUpdate(new BlockPos(cx + dx, y + dy, cz + dz), brick);
+					lp(world, cx, cz, dir, y + dy, lx, lz, brick);
 				}
-				if (dz == h && dx == 0) {
+				if (lz == h && lx == 0) { // 门面开门洞
 					for (int dy = 1; dy <= 3; dy++) {
-						world.setBlockAndUpdate(new BlockPos(cx + dx, y + dy, cz + dz), Blocks.AIR.defaultBlockState());
+						lp(world, cx, cz, dir, y + dy, lx, lz, Blocks.AIR.defaultBlockState());
 					}
 				}
 			}
 		}
-		for (int dx = -h; dx <= h; dx++) {
-			for (int dz = -h; dz <= h; dz++) {
-				set(world, cx + dx, y + 6, cz + dz, brick);
+		for (int lx = -h; lx <= h; lx++) {
+			for (int lz = -h; lz <= h; lz++) {
+				lp(world, cx, cz, dir, y + 6, lx, lz, brick);
 			}
 		}
-		set(world, cx, y + 7, cz, Blocks.LANTERN.defaultBlockState());
-		for (int dx = -3; dx <= 3; dx++) {
-			set(world, cx + dx, y + 2, cz - 3, Blocks.BOOKSHELF.defaultBlockState());
-			set(world, cx + dx, y + 3, cz - 3, Blocks.BOOKSHELF.defaultBlockState());
-			set(world, cx + dx, y + 2, cz + 3, Blocks.BOOKSHELF.defaultBlockState());
-			set(world, cx + dx, y + 3, cz + 3, Blocks.BOOKSHELF.defaultBlockState());
+		lp(world, cx, cz, dir, y + 7, 0, 0, Blocks.LANTERN.defaultBlockState());
+		for (int lx = -3; lx <= 3; lx++) {
+			lp(world, cx, cz, dir, y + 2, lx, -3, Blocks.BOOKSHELF.defaultBlockState());
+			lp(world, cx, cz, dir, y + 3, lx, -3, Blocks.BOOKSHELF.defaultBlockState());
+			lp(world, cx, cz, dir, y + 2, lx, 3, Blocks.BOOKSHELF.defaultBlockState());
+			lp(world, cx, cz, dir, y + 3, lx, 3, Blocks.BOOKSHELF.defaultBlockState());
 		}
-		for (int dz = -2; dz <= 2; dz++) {
-			set(world, cx - 3, y + 2, cz + dz, Blocks.BOOKSHELF.defaultBlockState());
-			set(world, cx + 3, y + 2, cz + dz, Blocks.BOOKSHELF.defaultBlockState());
+		for (int lz = -2; lz <= 2; lz++) {
+			lp(world, cx, cz, dir, y + 2, -3, lz, Blocks.BOOKSHELF.defaultBlockState());
+			lp(world, cx, cz, dir, y + 2, 3, lz, Blocks.BOOKSHELF.defaultBlockState());
 		}
-		set(world, cx, y + 2, cz - 1, Blocks.CRAFTING_TABLE.defaultBlockState());
+		lp(world, cx, cz, dir, y + 2, 0, -1, Blocks.CRAFTING_TABLE.defaultBlockState());
 	}
 
-	/** 酒馆：石砖小楼，室内木桶酒桌 + 中央石围壁炉（营火）。 */
+	/** 酒馆：石砖小楼，室内木桶酒桌 + 中央石围壁炉（营火）。门开在朝向中心的一面。 */
 	private static void buildTavern(final ServerLevel world) {
 		final int cx = MainIslandConfig.CENTER_X + 30;
 		final int cz = MainIslandConfig.CENTER_Z + 30;
 		final int y = MainIslandConfig.Y;
+		final Direction dir = doorDirFor(cx, cz);
 		final int h = 4;
 		final BlockState brick = Blocks.STONE_BRICKS.defaultBlockState();
-		for (int dx = -h; dx <= h; dx++) {
-			for (int dz = -h; dz <= h; dz++) {
-				final boolean edge = Math.abs(dx) == h || Math.abs(dz) == h;
+		for (int lx = -h; lx <= h; lx++) {
+			for (int lz = -h; lz <= h; lz++) {
+				final boolean edge = Math.abs(lx) == h || Math.abs(lz) == h;
 				if (!edge) {
 					continue;
 				}
 				for (int dy = 1; dy <= 5; dy++) {
-					world.setBlockAndUpdate(new BlockPos(cx + dx, y + dy, cz + dz), brick);
+					lp(world, cx, cz, dir, y + dy, lx, lz, brick);
 				}
-				if (dz == h && dx == 0) {
+				if (lz == h && lx == 0) {
 					for (int dy = 1; dy <= 3; dy++) {
-						world.setBlockAndUpdate(new BlockPos(cx + dx, y + dy, cz + dz), Blocks.AIR.defaultBlockState());
+						lp(world, cx, cz, dir, y + dy, lx, lz, Blocks.AIR.defaultBlockState());
 					}
 				}
 			}
 		}
-		for (int dx = -h; dx <= h; dx++) {
-			for (int dz = -h; dz <= h; dz++) {
-				set(world, cx + dx, y + 6, cz + dz, brick);
+		for (int lx = -h; lx <= h; lx++) {
+			for (int lz = -h; lz <= h; lz++) {
+				lp(world, cx, cz, dir, y + 6, lx, lz, brick);
 			}
 		}
-		set(world, cx, y + 7, cz, Blocks.LANTERN.defaultBlockState());
-		set(world, cx - 2, y + 2, cz - 2, Blocks.BARREL.defaultBlockState());
-		set(world, cx + 2, y + 2, cz - 2, Blocks.BARREL.defaultBlockState());
-		set(world, cx - 2, y + 2, cz + 2, Blocks.BARREL.defaultBlockState());
-		set(world, cx + 2, y + 2, cz + 2, Blocks.BARREL.defaultBlockState());
-		// 壁炉：营火用圆石四面围住，只冒光不蔓延
-		set(world, cx, y + 1, cz - 1, Blocks.COBBLESTONE.defaultBlockState());
-		set(world, cx, y + 3, cz - 1, Blocks.COBBLESTONE.defaultBlockState());
-		set(world, cx - 1, y + 2, cz - 1, Blocks.COBBLESTONE.defaultBlockState());
-		set(world, cx + 1, y + 2, cz - 1, Blocks.COBBLESTONE.defaultBlockState());
-		set(world, cx, y + 2, cz - 1, lit(Blocks.CAMPFIRE));
+		lp(world, cx, cz, dir, y + 7, 0, 0, Blocks.LANTERN.defaultBlockState());
+		lp(world, cx, cz, dir, y + 2, -2, -2, Blocks.BARREL.defaultBlockState());
+		lp(world, cx, cz, dir, y + 2, 2, -2, Blocks.BARREL.defaultBlockState());
+		lp(world, cx, cz, dir, y + 2, -2, 2, Blocks.BARREL.defaultBlockState());
+		lp(world, cx, cz, dir, y + 2, 2, 2, Blocks.BARREL.defaultBlockState());
+		// 壁炉：营火用圆石四面围住，只冒光不蔓延（位于门内后墙侧 lz=-1）
+		lp(world, cx, cz, dir, y + 1, 0, -1, Blocks.COBBLESTONE.defaultBlockState());
+		lp(world, cx, cz, dir, y + 3, 0, -1, Blocks.COBBLESTONE.defaultBlockState());
+		lp(world, cx, cz, dir, y + 2, -1, -1, Blocks.COBBLESTONE.defaultBlockState());
+		lp(world, cx, cz, dir, y + 2, 1, -1, Blocks.COBBLESTONE.defaultBlockState());
+		lp(world, cx, cz, dir, y + 2, 0, -1, lit(Blocks.CAMPFIRE));
+	}
+
+	/** 灯塔（东南角）：石英高塔 + 金顶灯笼，主岛远眺地标。 */
+	private static void buildLighthouse(final ServerLevel world) {
+		final int cx = MainIslandConfig.CENTER_X + 84;
+		final int cz = MainIslandConfig.CENTER_Z + 84;
+		final int y = MainIslandConfig.Y;
+		final BlockState qs = Blocks.QUARTZ_BLOCK.defaultBlockState();
+		for (int lx = -1; lx <= 1; lx++) {
+			for (int lz = -1; lz <= 1; lz++) {
+				for (int dy = 1; dy <= 14; dy++) {
+					set(world, cx + lx, y + dy, cz + lz, qs);
+				}
+			}
+		}
+		for (int lx = -2; lx <= 2; lx++) {
+			for (int lz = -2; lz <= 2; lz++) {
+				set(world, cx + lx, y, cz + lz, Blocks.STONE_BRICKS.defaultBlockState());
+			}
+		}
+		set(world, cx, y + 15, cz, Blocks.GOLD_BLOCK.defaultBlockState());
+		set(world, cx, y + 16, cz, Blocks.LANTERN.defaultBlockState());
+	}
+
+	/** 马厩（西南角）：橡木栅栏围栏 + 干草堆 + 石砖马槽。 */
+	private static void buildStable(final ServerLevel world) {
+		final int cx = MainIslandConfig.CENTER_X - 84;
+		final int cz = MainIslandConfig.CENTER_Z + 84;
+		final int y = MainIslandConfig.Y;
+		for (int lx = -4; lx <= 4; lx++) {
+			set(world, cx + lx, y + 1, cz - 4, Blocks.OAK_FENCE.defaultBlockState());
+			set(world, cx + lx, y + 2, cz - 4, Blocks.OAK_FENCE.defaultBlockState());
+			set(world, cx + lx, y + 1, cz + 4, Blocks.OAK_FENCE.defaultBlockState());
+			set(world, cx + lx, y + 2, cz + 4, Blocks.OAK_FENCE.defaultBlockState());
+		}
+		for (int lz = -4; lz <= 4; lz++) {
+			set(world, cx - 4, y + 1, cz + lz, Blocks.OAK_FENCE.defaultBlockState());
+			set(world, cx - 4, y + 2, cz + lz, Blocks.OAK_FENCE.defaultBlockState());
+			set(world, cx + 4, y + 1, cz + lz, Blocks.OAK_FENCE.defaultBlockState());
+			set(world, cx + 4, y + 2, cz + lz, Blocks.OAK_FENCE.defaultBlockState());
+		}
+		set(world, cx - 2, y + 1, cz - 2, Blocks.HAY_BLOCK.defaultBlockState());
+		set(world, cx + 2, y + 1, cz - 2, Blocks.HAY_BLOCK.defaultBlockState());
+		set(world, cx - 2, y + 1, cz + 2, Blocks.HAY_BLOCK.defaultBlockState());
+		set(world, cx + 2, y + 1, cz + 2, Blocks.HAY_BLOCK.defaultBlockState());
+		for (int lx = -3; lx <= 3; lx++) {
+			set(world, cx + lx, y + 1, cz, Blocks.STONE_BRICKS.defaultBlockState());
+		}
+	}
+
+	/** 果园（西北角）：果树阵 + 盆栽苹果点缀。 */
+	private static void buildOrchard(final ServerLevel world) {
+		final int cx = MainIslandConfig.CENTER_X - 80;
+		final int cz = MainIslandConfig.CENTER_Z - 60;
+		final int y = MainIslandConfig.Y;
+		for (int lx = -8; lx <= 8; lx += 4) {
+			for (int lz = -8; lz <= 8; lz += 4) {
+			plantTree(world, cx + lx, y, cz + lz);
+			set(world, cx + lx + 1, y + 1, cz + lz, Blocks.POTTED_OAK_SAPLING.defaultBlockState());
+			}
+		}
+	}
+
+	/** 骑士雕像（空地）：石砖基座 + 铁块身躯 + 南瓜灯头 + 铁剑。 */
+	private static void buildKnightStatue(final ServerLevel world) {
+		final int cx = MainIslandConfig.CENTER_X - 46;
+		final int cz = MainIslandConfig.CENTER_Z + 46;
+		final int y = MainIslandConfig.Y;
+		for (int lx = -1; lx <= 1; lx++) {
+			for (int lz = -1; lz <= 1; lz++) {
+				set(world, cx + lx, y, cz + lz, Blocks.STONE_BRICKS.defaultBlockState());
+			}
+		}
+		for (int dy = 1; dy <= 3; dy++) {
+			set(world, cx, y + dy, cz, Blocks.IRON_BLOCK.defaultBlockState());
+		}
+		set(world, cx - 1, y + 2, cz, Blocks.IRON_BLOCK.defaultBlockState());
+		set(world, cx + 1, y + 2, cz, Blocks.IRON_BLOCK.defaultBlockState());
+		set(world, cx, y + 4, cz, Blocks.CARVED_PUMPKIN.defaultBlockState());
+		set(world, cx + 1, y, cz + 1, Blocks.IRON_BLOCK.defaultBlockState());
+		set(world, cx + 1, y + 1, cz + 1, Blocks.IRON_BLOCK.defaultBlockState());
 	}
 
 	/** 四块农田：分布在四条主街外延的开阔地，围栏 + 中央水源 + 成熟作物。 */
@@ -1371,6 +1471,34 @@ public final class MainIsland {
 
 	private static void set(final ServerLevel world, final int x, final int y, final int z, final BlockState state) {
 		world.setBlockAndUpdate(new BlockPos(x, y, z), state);
+	}
+
+	/** 建筑相对中心的「门朝向」：门开在面向中心的那一面。等距时优先用 Z 轴。 */
+	private static Direction doorDirFor(final int bx, final int bz) {
+		final int dx = bx - MainIslandConfig.CENTER_X;
+		final int dz = bz - MainIslandConfig.CENTER_Z;
+		if (Math.abs(dz) >= Math.abs(dx)) {
+			return dz < 0 ? Direction.SOUTH : Direction.NORTH; // 在中心北侧→门朝南(+Z)；南侧→门朝北(-Z)
+		}
+		return dx < 0 ? Direction.EAST : Direction.WEST; // 在中心西侧→门朝东(+X)；东侧→门朝西(-X)
+	}
+
+	/**
+	 * 局部坐标 → 世界坐标。建筑用「局部坐标」描述：lx 沿侧面轴、lz 沿门面法向（lz=+h 即门所在面）。
+	 * 通过 dir 旋转后映射到世界，从而实现「门永远朝中心」。
+	 */
+	private static int[] lpPos(final int cx, final int cz, final Direction dir, final int lx, final int lz) {
+		if (dir == Direction.NORTH || dir == Direction.SOUTH) {
+			return new int[]{cx + lx, cz + dir.getStepZ() * lz};
+		}
+		return new int[]{cx + dir.getStepX() * lz, cz + lx};
+	}
+
+	/** 局部坐标放置方块（y 单独传）。 */
+	private static void lp(final ServerLevel world, final int cx, final int cz, final Direction dir,
+			final int y, final int lx, final int lz, final BlockState state) {
+		final int[] p = lpPos(cx, cz, dir, lx, lz);
+		world.setBlockAndUpdate(new BlockPos(p[0], y, p[1]), state);
 	}
 
 	private static BlockState stair(final net.minecraft.world.level.block.Block block, final Direction facing) {

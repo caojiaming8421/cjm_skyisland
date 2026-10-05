@@ -87,6 +87,29 @@ public class CjmVillager extends PathfinderMob implements Merchant {
 		if (this.isTrading()) {
 			this.getNavigation().stop();
 		}
+		// 店铺村民（setNoAi）自身不跑 AI，所以用这里手动让它「有玩家靠近时面朝该玩家」
+		if (this.isNoAi()) {
+			Player nearest = null;
+			double bestSq = 10.0D * 10.0D; // 仅在 10 格内响应
+			for (final Player p : this.level().players()) {
+				final double dx = p.getX() - this.getX();
+				final double dz = p.getZ() - this.getZ();
+				final double dSq = dx * dx + dz * dz;
+				if (dSq <= bestSq) {
+					bestSq = dSq;
+					nearest = p;
+				}
+			}
+			if (nearest != null) {
+				final double dx = nearest.getX() - this.getX();
+				final double dz = nearest.getZ() - this.getZ();
+				// Minecraft 朝向约定：yaw=0 面朝 -Z；atan2(-dx,-dz) 使 forward 指向玩家
+				final float yaw = (float) Math.atan2(-dx, -dz);
+				this.setYBodyRot(yaw);
+				this.setYHeadRot(yaw);
+				this.setYRot(yaw);
+			}
+		}
 	}
 
 	// ==================== 店铺类型 ====================
